@@ -1,0 +1,428 @@
+\documentclass[autodetect-engine,dvipdfmx]{jsarticle}
+
+\usepackage{okumacro}
+\usepackage[top=25truemm,bottom=25truemm,left=25truemm,right=25truemm]{geometry}
+\usepackage[dvipdfmx]{xcolor}
+\usepackage{ascmac}
+\usepackage{listings,jlisting}
+\usepackage{latexltx2015}
+
+\begin{document}
+
+\title{ latex.ltxリーディング \\ 第7回資料 }
+\author{ 東大\TeX 愛好会 }
+\date{2015年10月12日}
+\maketitle
+
+\section{smash（大浦）}
+
+\subsection{使用例}
+
+まず，\cmd{smash}の使用例について軽く見ておこう。\cmd{smash}は，引数に与えられたテキストの「高さ・深さを0にする」というコマンドである。つまり，
+\[
+\int^a_b\sqrt{|x|}\,dx
+\]
+を大かっこでくくるような場合を考えよう。ここで，\cmd{int\^\,a\_b}を\cmd{smash}でくくるかくくらないかで次のような出力の差を生む。ちなみに一番右の例は，\cmd{left}〜\cmd{right}でくくっていないもとの大かっこの大きさで出力している。
+\[
+\left[\int^a_b\sqrt{|x|}\,dx\right] \left[\smash{\int^a_b}\sqrt{|x|}\,dx\right] [\int^a_b\sqrt{|x|}\,dx]
+\]
+インテグラルを\cmd{smash}の引数に指定しておくと，インテグラルの高さは0とみなされ，その次に一番高さが大きかった$\sqrt{|x|}$に大かっこのサイズが合うようになっている。
+
+（ゼミで判明した内容：ちなみに，後述するとおりcolor系のパッケージをincludeしておかないと使えない模様。）
+
+\subsection{定義}
+
+\cmd{smash}まわりの定義をまず下に載せておく。
+
+\latexltx
+\begin{lstlisting}[firstnumber=4136]
+\def\smash{%
+  \relax % \relax, in case this comes first in \halign
+  \ifmmode
+    \expandafter\mathpalette\expandafter\mathsm@sh
+  \else
+    \expandafter\makesm@sh
+  \fi}
+\def\makesm@sh#1{%
+  \setbox\z@\hbox{\color@begingroup#1\color@endgroup}\finsm@sh}
+\def\mathsm@sh#1#2{%
+  \setbox\z@\hbox{$\m@th#1{#2}$}\finsm@sh}
+\def\finsm@sh{\ht\z@\z@ \dp\z@\z@ \box\z@}
+\end{lstlisting}
+
+この定義を理解するために，まず，数式モードの外で\cmd{smash}を使うとき，\preSub\verb|\smash{あいうえ}|\preSub というコマンドを考える。
+
+まずこれは次のように展開される。
+
+\texsource
+\begin{lstlisting}
+\relax\ifmmode\expandafter\mathpalette\expandafter\mathsm@sh\else\expandafter\makesm@sh\fi{あいうえ}
+\end{lstlisting}
+
+\cmd{relax}はそのまま読みとばされ，\cmd{ifmmode}の条件分岐に入る。いま，数式モードではないので，\cmd{else}まで飛ばされる。その次の\cmd{expandafter}によって\cmd{fi}が読まれ，条件分岐が終わったと認識される。そしてその次に\cmd{makesm@sh}が展開されていく。
+
+つまり，
+
+\texsource
+\begin{lstlisting}
+\makesm@sh{あいうえ}
+\end{lstlisting}
+が展開されることに相当する。
+ここで\cmd{makesm@sh}の定義を代入して，次のように変換される。
+
+\texsource
+\begin{lstlisting}
+\setbox\z@\hbox{\color@begingroupあいうえ\color@endgroup}\finsm@sh\end{lstlisting}
+
+まず，\preSub\verb|\setbox\z@\hbox{...}|\preSub によって，0番のボックスレジスタにここの\cmd{hbox}を割り振る。そして\cmd{hbox}が作られる。さらに\cmd{hbox}の中を展開する。\cmd{color@begingroup}はcolor系のスタイルファイルを読み込むときに\cmd{bgroup}に置き換えられ，\cmd{color@endgroup}はcolor系のスタイルファイルをを読み込むときに，\preSub\verb|\endgraf\endgroup|\preSub になる。（ここでcolor系統のパッケージが必要になる。）ここで\cmd{endgraf}は，\texttt{latex.ltx}の438行目に次のように定義されている。
+
+\latexltx
+\begin{lstlisting}[firstnumber=438]
+\let\endgraf=\par
+\end{lstlisting}
+
+また，\cmd{finsm@sh}の定義を再掲すると，次のようであった。
+
+\latexltx
+\begin{lstlisting}[firstnumber=4147]
+\def\finsm@sh{\ht\z@\z@ \dp\z@\z@ \box\z@}
+\end{lstlisting}
+
+これらを代入すると，
+
+\texsource
+\begin{lstlisting}
+\hbox{{あいうえ\par}}\ht\z@\z@ \dp\z@\z@ \box\z@
+\end{lstlisting}
+となる。つまり，0番のボックスレジスタに入れた\cmd{hbox}に対して，\cmd{ht}つまり高さ，および\cmd{dp}つまり深さを，0にする操作をするコマンドとなっている。ここが\cmd{smash}の肝となる部分といえよう。
+
+いま，数式モードの外で\cmd{smash}を使う例を見てきた。次は，数式モード内で\cmd{smash}を使う例を見てみよう。たとえば\preSub\verb|\[\smash{1+2=3}\]|\preSub というコマンドを考える。
+
+まずこれは次のように展開される。（\cmd{[}，\cmd{]} については略した。）
+
+\texsource
+\begin{lstlisting}
+\relax\ifmmode\expandafter\mathpalette\expandafter\mathsm@sh\else\expandafter\makesm@sh\fi{1+2=3}
+\end{lstlisting}
+
+\cmd{relax}はそのまま読みとばされ，\cmd{ifmmode}の条件分岐に入る。いま，数式モード内なので，次の\cmd{expandafter}が読まれる。すると，\cmd{mathpalette}を飛ばして，２つ目の\cmd{expandafter}が読まれる。これにより，\cmd{mathsm@sh}が飛ばされ，\cmd{else}が読まれる。ここで，条件分岐は終了したものと判断され，その次に\cmd{mathpalette}，その次に\cmd{mathsm@sh}が展開されることとなる。つまり，
+
+\texsource
+\begin{lstlisting}
+\mathpalette\mathsm@sh{1+2=3}
+\end{lstlisting}
+の\cmd{mathpalette}が展開されることになる。\cmd{mathpalette}は，\texttt{latex.ltx}中に次のように定義されている。
+
+\latexltx
+\begin{lstlisting}[firstnumber=4101]
+\def\mathpalette#1#2{%
+  \mathchoice
+    {#1\displaystyle{#2}}%
+    {#1\textstyle{#2}}%
+    {#1\scriptstyle{#2}}%
+    {#1\scriptscriptstyle{#2}}}
+\end{lstlisting}
+
+よって，次のように展開される。
+
+\texsource
+\begin{lstlisting}
+  \mathchoice
+    {\mathsm@sh\displaystyle{1+2=3}}%
+    {\mathsm@sh\textstyle{1+2=3}}%
+    {\mathsm@sh\scriptstyle{1+2=3}}%
+    {\mathsm@sh\scriptscriptstyle{1+2=3}}
+\end{lstlisting}
+
+\cmd{mathchoice}は引数を四つとる\TeX プリミティブで，四つの引数の中は順に，\texttt{displaystyle}，\texttt{textstyle}，\texttt{scriptstyle}，\texttt{scriptscriptstyle}，
+内でのコードを記述する。
+
+例えば今回のように，\texttt{displaystyle}の数式モード内で\cmd{smash}を使った場合には，最初の引数内のコードが使われ，　
+
+\texsource
+\begin{lstlisting}
+\mathsm@sh\displaystyle{1+2=3}
+\end{lstlisting}
+と展開される。
+
+
+次にいよいよ\cmd{mathsm@sh}の展開だが，定義は次のようであった（再掲）。
+
+\latexltx
+\begin{lstlisting}[firstnumber=4145]
+\def\mathsm@sh#1#2{%
+  \setbox\z@\hbox{$\m@th#1{#2}$}\finsm@sh}
+\end{lstlisting}
+
+よって展開結果は次のようになる。
+
+\texsource
+\begin{lstlisting}
+\setbox\z@\hbox{$\m@th\displaystyle{1+2=3}$}\finsm@sh
+\end{lstlisting}
+
+まず，\preSub\verb|\setbox\z@\hbox{...}|\preSub によって，0番のボックスレジスタにここの\cmd{hbox}を割り振る。そして\cmd{hbox}が作られる。さらに\cmd{hbox}の中を展開する。
+
+\$ ハサミの効果により数式モードになっており，\cmd{m@th}によって数式モード外との境界に無駄なスペースが入らないようになっている（\cmd{m@th}については第1回Reading資料に説明がある）。そして，$1+2=3$が\texttt{displaystyle}で表示される。
+
+さて，最後にまた，\cmd{finsm@sh}の展開である。0番のボックスレジスタに入れた\cmd{hbox}に対して，\cmd{ht}つまり高さ，および\cmd{dp}つまり深さを，0にする操作を担っていることは先に述べた通りである。
+
+これにより，数式モード中でも\cmd{smash}を使うことができた。
+
+%\begin{question}
+%ここで，\cmd{mathsm@sh}は引数を二つ取るという事態に直面する。考えているソースでは，引数は一つしか出てこない。どうなってるんだ。
+%\end{question}
+
+%ちょっとわからなくなったのでここで筆を休めます。
+
+\ 
+
+さて，若干気になるのが，4137行目の記述，「\preSub\verb|\relax, in case this comes first in \halign|\preSub」だ。実際に展開した状態で\cmd{halign}の先頭で使ってみた。つまり，次のようにソースを書き，\cmd{relax}のある状態とない状態での比較を試みた。
+
+\noindent ソース１
+\texsource
+\begin{lstlisting}
+\halign{\relax\setbox0\hbox{{$\displaystyle\int$\par}}\ht00 \dp00 \box0#1\cr
+\noalign{\hrule}
+www\cr
+\noalign{\hrule}}
+\end{lstlisting}
+
+\noindent ソース２
+\texsource
+\begin{lstlisting}
+\halign{\setbox0\hbox{{$\displaystyle\int$\par}}\ht00 \dp00 \box0#1\cr
+\noalign{\hrule}
+www\cr
+\noalign{\hrule}}
+\end{lstlisting}
+
+その結果が以下。
+
+\noindent ソース１
+
+\ 
+
+\halign{\relax\setbox0\hbox{{$\displaystyle\int$\par}}\ht00 \dp00 \box0#1\cr
+\noalign{\hrule}
+www\cr
+\noalign{\hrule}}
+
+\ 
+
+\noindent ソース２
+
+\ 
+
+\halign{\setbox0\hbox{{$\displaystyle\int$\par}}\ht00 \dp00 \box0#1\cr
+\noalign{\hrule}
+www\cr
+\noalign{\hrule}}
+
+\ 
+
+\begin{question}
+コンパイルもどちらも問題なく通るし，\cmd{relax}の有無の差が見えてこない。
+\end{question}
+\section{\LaTeX における各種レジスタの管理（大門）}
+
+今回は，\TeX に本来備わっている\cmd{count}，\cmd{dimen}など各種レジスタの，\LaTeX 流管理の実装を調べていく。
+
+\subsection{前提知識}
+
+\TeX は，\cmd{count}（整数），\cmd{dimen}（寸法），\cmd{skip}（グルー），\cmd{muskip}（数式用グルー），\cmd{box}（ボックス），\cmd{toks}（トークンリスト）というデータ型を持ち，素の（e-\TeX 拡張などされていない）\TeX エンジンの場合，これらの型には0から255までの番号をもつレジスタ（変数）が用意されている\footnote{その他のエンジンでは，「たくさん」（32768または65536個）のレジスタが用意されている。}。
+
+さて，plain \TeX および（2014年以前の）\LaTeX では，この0から255まで用意された各種レジスタを，以下のように使用している。
+
+\begin{center}
+\begin{tabular}{ccccc} \hline
+ 番号 & \cmd{count} & \cmd{dimen}，\cmd{skip} & \cmd{box} & \cmd{musikip}，\cmd{toks} \\ \hline
+ 0 - 9 & ページ番号 & スクラッチ & スクラッチ & スクラッチ \\ \hline
+ 10 - 20 & 各種レジスタの割当済み番号 & 割当用 & 割当用 & 割当用 \\ \hline
+ 21 & \cmd{allocationnumber} & 割当用 & 割当用 & 割当用 \\ \hline
+ 22 & 定数``-1'' & 割当用 &割当用&割当用\\\hline
+ 23 - (/-1) & 割当用&割当用&割当用&割当用\\\hline
+ / - 254 & insert用&insert用&insert用&割当用\\\hline
+ 255 &スクラッチ&スクラッチ&スクラッチ&スクラッチ\\\hline
+\end{tabular}
+\end{center}
+
+ただし，/は\cmd{count20}（割当済insert番号）の値。また，「スクラッチ」は\cmd{dimen255}（\cmd{dimen@}）のように，割当なしで使えるよう予め用意されたレジスタのこと
+
+{\footnotesize『\LaTeX2$\varepsilon$【マクロ\&クラス】プログラミング基礎解説』およびマクロツイーター\par
+\noindent（\texttt{http://d.hatena.ne.jp/zrbabbler/20150503/1430658474}\hspace{1zw}\texttt{http://d.hatena.ne.jp/zrbabbler/20150504/1430721128}）を参照した。}
+
+
+\subsection{実装コード}
+
+\latexltx
+\begin{lstlisting}[firstnumber=302]
+\message{registers,}
+\count10=22 % allocates \count registers 23, 24, ...
+\count11=9 % allocates \dimen registers 10, 11, ...
+\count12=9 % allocates \skip registers 10, 11, ...
+\count13=9 % allocates \muskip registers 10, 11, ...
+\count14=9 % allocates \box registers 10, 11, ...
+\count15=9 % allocates \toks registers 10, 11, ...
+\count16=-1 % allocates input streams 0, 1, ...
+\count17=-1 % allocates output streams 0, 1, ...
+\count18=3 % allocates math families 4, 5, ...
+\count19=0 % allocates \language codes 1, 2, ...
+\count20=255 % allocates insertions 254, 253, ...
+\countdef\insc@unt=20
+\countdef\allocationnumber=21
+\countdef\m@ne=22 \m@ne=-1
+\def\wlog{\immediate\write\m@ne}
+\countdef\count@=255
+\dimendef\dimen@=0
+\dimendef\dimen@i=1 % global only
+\dimendef\dimen@ii=2
+\skipdef\skip@=0
+\toksdef\toks@=0
+\def\newcount{\alloc@0\count\countdef\insc@unt}
+\def\newdimen{\alloc@1\dimen\dimendef\insc@unt}
+\def\newskip{\alloc@2\skip\skipdef\insc@unt}
+\def\newmuskip{\alloc@3\muskip\muskipdef\@cclvi}
+\def\newbox{\alloc@4\box\chardef\insc@unt}
+\def\newhelp#1#2{\newtoks#1#1\expandafter{\csname#2\endcsname}}
+\def\newtoks{\alloc@5\toks\toksdef\@cclvi}
+\def\newread{\alloc@6\read\chardef\sixt@@n}
+\def\newwrite{\alloc@7\write\chardef\sixt@@n}
+\def\newlanguage{\alloc@9\language\chardef\@cclvi}
+\def\alloc@#1#2#3#4#5{\global\advance\count1#1\@ne
+  \ch@ck#1#4#2% make sure there's still room
+  \allocationnumber\count1#1%
+  \global#3#5\allocationnumber
+  \wlog{\string#5=\string#2\the\allocationnumber}}
+\def\newinsert#1{\global\advance\insc@unt \m@ne
+  \ch@ck0\insc@unt\count
+  \ch@ck1\insc@unt\dimen
+  \ch@ck2\insc@unt\skip
+  \ch@ck4\insc@unt\box
+  \allocationnumber\insc@unt
+  \global\chardef#1\allocationnumber
+  \wlog{\string#1=\string\insert\the\allocationnumber}}
+\gdef\ch@ck#1#2#3{%
+  \ifnum\count1#1<#2\else
+   \errmessage{No room for a new #3}%
+  \fi}
+\newdimen\maxdimen \maxdimen=16383.99999pt % the largest legal <dimen>
+\newskip\hideskip \hideskip=-1000pt plus 1fill % negative but can grow
+\newdimen\p@ \p@=1pt % this saves macro space and time
+\newdimen\z@ \z@=0pt % can be used both for 0pt and 0
+\newskip\z@skip \z@skip=0pt plus0pt minus0pt
+\newbox\voidb@x % permanently void box register
+\end{lstlisting}
+
+まず冒頭で，\cmd{message}によりレジスタ関連の定義が始まることを示してから処理に入る。非常に長いので，幾つかに分割してこれらのコードの動作を分析していく。
+
+\subsection{初期設定部（仮称）について}
+
+\begin{lstlisting}[firstnumber=302]
+\message{registers,}
+\count10=22 % allocates \count registers 23, 24, ...
+\count11=9 % allocates \dimen registers 10, 11, ...
+\count12=9 % allocates \skip registers 10, 11, ...
+\count13=9 % allocates \muskip registers 10, 11, ...
+\count14=9 % allocates \box registers 10, 11, ...
+\count15=9 % allocates \toks registers 10, 11, ...
+\count16=-1 % allocates input streams 0, 1, ...
+\count17=-1 % allocates output streams 0, 1, ...
+\count18=3 % allocates math families 4, 5, ...
+\count19=0 % allocates \language codes 1, 2, ...
+\count20=255 % allocates insertions 254, 253, ...
+\countdef\insc@unt=20
+\countdef\allocationnumber=21
+\countdef\m@ne=22 \m@ne=-1
+\def\wlog{\immediate\write\m@ne}
+\countdef\count@=255
+\dimendef\dimen@=0
+\dimendef\dimen@i=1 % global only
+\dimendef\dimen@ii=2
+\skipdef\skip@=0
+\toksdef\toks@=0
+\end{lstlisting}
+
+この部分は特にどうと言うことも無く，特殊な役割をもつレジスタの使用を準備しているだけである。
+
+\subsection{\cmd{newcount}系の定義部（仮称）について}
+
+\begin{lstlisting}[firstnumber=324]
+\def\newcount{\alloc@0\count\countdef\insc@unt}
+\def\newdimen{\alloc@1\dimen\dimendef\insc@unt}
+\def\newskip{\alloc@2\skip\skipdef\insc@unt}
+\def\newmuskip{\alloc@3\muskip\muskipdef\@cclvi}
+\def\newbox{\alloc@4\box\chardef\insc@unt}
+\def\newhelp#1#2{\newtoks#1#1\expandafter{\csname#2\endcsname}}
+\def\newtoks{\alloc@5\toks\toksdef\@cclvi}
+\def\newread{\alloc@6\read\chardef\sixt@@n}
+\def\newwrite{\alloc@7\write\chardef\sixt@@n}
+\def\newlanguage{\alloc@9\language\chardef\@cclvi}
+\def\alloc@#1#2#3#4#5{\global\advance\count1#1\@ne
+  \ch@ck#1#4#2% make sure there's still room
+  \allocationnumber\count1#1%
+  \global#3#5\allocationnumber
+  \wlog{\string#5=\string#2\the\allocationnumber}}
+\def\newinsert#1{\global\advance\insc@unt \m@ne
+  \ch@ck0\insc@unt\count
+  \ch@ck1\insc@unt\dimen
+  \ch@ck2\insc@unt\skip
+  \ch@ck4\insc@unt\box
+  \allocationnumber\insc@unt
+  \global\chardef#1\allocationnumber
+  \wlog{\string#1=\string\insert\the\allocationnumber}}
+\gdef\ch@ck#1#2#3{%
+  \ifnum\count1#1<#2\else
+   \errmessage{No room for a new #3}%
+  \fi}
+\end{lstlisting}
+
+ここでは\cmd{newcount}，\cmd{newdimen}，\cmd{newskip}，\cmd{newmuskip}，\cmd{newbox}，\cmd{newtoks}をまとめて\cmd{newcount}系と呼ぶことにする（他の\cmd{newinsert}，\cmd{newhelp}，\cmd{newread}，\cmd{newwrite}，\cmd{newlanguage}については，今回は措いておく）。これら\cmd{newcount}系の実装はどれも似通っているので，代表例として\cmd{newcount}の動作を追跡していくことにしよう。
+
+\subsubsection{具体例}
+以下の様なソースコードを実行する事を考える。
+\texsource
+\begin{lstlisting}
+\newcount\ほげ
+\end{lstlisting}
+これを上に従って適宜展開・実行していくと，次のようになる。
+\begin{lstlisting}
+   \newcount\ほげ
+
+-> \alloc@0\count\countdef\insc@unt\ほげ
+
+-> \global\advance\count10\@ne
+   \ch@ck0\insc@unt\count% make sure there's still room
+   \allocationnumber\count10%
+   \global\countdef\ほげ\allocationnumber
+   \wlog{\string\ほげ=\string\count\the\allocationnumber}
+
+   （\advanceが実行され，\count10の値が1増える）
+
+-> \ifnum\count10<\insc@unt\else
+    \errmessage{No room for a new \count}%
+   \fi
+   \allocationnumber\count10%
+   \global\countdef\ほげ\allocationnumber
+   \wlog{\string\ほげ=\string\count\the\allocationnumber}
+\end{lstlisting}
+
+ここの\cmd{ifnum}で，現在割り当てようとしているレジスタの番号が，割り当て済みのinsert番号（先の表中の``/''に相当）より小さいかを判別し，これを超過するようであればエラーが出る。このチェックを通り抜けた場合，\cmd{allocationnumber}に今から割り当てるレジスタの番号を格納し，
+\begin{lstlisting}
+\global\countdef\ほげ\allocationnumber
+\end{lstlisting}
+によってレジスタに\cmd{ほげ}を割り当てる。末尾の\cmd{wlog}は，\textit{source2e.pdf}に``Write on log file (only)''とあるように，\texttt{.log}ファイルに\cmd{ほげ}が定義された事を書き込む役割をもつ。
+
+\subsection{その他の定義部（仮称）について}
+\latexltx
+\begin{lstlisting}[firstnumber=351]
+\newdimen\maxdimen \maxdimen=16383.99999pt % the largest legal <dimen>
+\newskip\hideskip \hideskip=-1000pt plus 1fill % negative but can grow
+\newdimen\p@ \p@=1pt % this saves macro space and time
+\newdimen\z@ \z@=0pt % can be used both for 0pt and 0
+\newskip\z@skip \z@skip=0pt plus0pt minus0pt
+\newbox\voidb@x % permanently void box register
+\end{lstlisting}
+\cmd{maxdimen}は寸法レジスタの最大値を設定し，\cmd{hideskip}は伸びることも可能な負のスペース（アラインメントに使用されるようだが詳細は不明）を設定する。\cmd{p@}，\cmd{z@}，\cmd{z@skip}はお馴染みのメモリ削減テクニックの産物である。\cmd{voidb@x}は常に「空の」boxレジスタであり，\cmd{leavevmode}の定義に利用されたり，（普通のプログラム言語におけるNull値のように）レジスタを初期化するために利用されたりする。
+
+\end{document}

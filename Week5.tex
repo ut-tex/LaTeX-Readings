@@ -1,0 +1,82 @@
+\documentclass[autodetect-engine,dvipdfmx]{jsarticle}
+
+\usepackage{okumacro}
+\usepackage[top=25truemm,bottom=25truemm,left=25truemm,right=25truemm]{geometry}
+\usepackage[dvipdfmx]{xcolor}
+\usepackage{ascmac}
+\usepackage{listings,jlisting}
+\usepackage{latexltx2015}
+
+\begin{document}
+
+\title{ latex.ltxリーディング \\ 第5回資料 }
+\author{ 東大\TeX 愛好会 }
+\date{2015年6月12日}
+\maketitle
+
+\section{水平スペース（朝倉）}
+
+今回は\LaTeX の水平スペースについて簡単に見ていくことにする．例によって，関連する定義を
+記載する．
+
+\latexltx
+\begin{lstlisting}[firstnumber=1308]
+\DeclareRobustCommand\hspace{\@ifstar\@hspacer\@hspace}
+\def\@hspace#1{\hskip #1\relax}
+\def\@hspacer#1{\vrule \@width\z@\nobreak
+                \hskip #1\hskip \z@skip}
+\newskip\fill
+\fill = 0pt plus 1fill
+\def\stretch#1{\z@ \@plus #1fill\relax}
+\def\thinspace{\kern .16667em }
+\def\negthinspace{\kern-.16667em }
+\def\enspace{\kern.5em }
+\def\enskip{\hskip.5em\relax}
+\def\quad{\hskip1em\relax}
+\def\qquad{\hskip2em\relax}
+\end{lstlisting}
+
+ほとんど\TeX のプリミティブをわかりやすく使用しているだけであり，解説するようなことは
+あまりない．ひとまず，\cmd{hspace}から順に見ていくことにする．
+
+1308行目の定義から明らかなように，\cmd{hspace}は堅い制御綴として定義されており，また\preSub
+\texttt{*}\preSub の有無によって分岐が行われるようになっている．\texttt{*}\preSub がない場合には
+\cmd{@hspace}が展開されて，プリミティブ\cmd{hskip}を用いた任意幅のグルーが挿入されるように
+なっている．後ろに\cmd{relax}が置かれている理由は後述する．
+
+一方，\cmd{hspace*}\preSub は一般に強制改行\preSub\verb|\\|\preSub の直後で利用されるものだが，
+この場合は\cmd{@hspacer}が展開される．こちらの方が，先ほどの\cmd{@hspace}よりはやや定義が長く
+なるが，いずれにせよそれほど複雑ではない．水平モードに切り替えるため幅0ptの\cmd{vrule}が挿入
+されている．なお，ここに登場する\cmd{@width}は単なる文字列の置き換えマクロである．
+ついでなので，\texttt{latex.ltx}の関連する部分をまとめて引っ張っておく．
+\begin{lstlisting}[firstnumber=563]
+\def\@height{height} \def\@depth{depth} \def\@width{width}
+\def\@minus{minus}
+\def\@plus{plus}
+\def\hb@xt@{\hbox to}
+\end{lstlisting}
+こうした置換えは，\TeX の処理時にメモリ使用量を軽減するための工夫らしい．
+
+また，\cmd{z@skip}は355行目で\preSub\verb|\newskip\z@skip \z@skip=0pt plus0pt minus0pt|と
+定義されている．\cmd{newskip}は簡単に言うと寸法レジスタを生成するマクロである．後半の
+\texttt{plus0pt minus0pt}はそれぞれ伸長度と収縮度を指定しており，要するに\cmd{z@skip}では
+一切の伸縮を許容していないことになる．なお，\cmd{hspace}などの定義末尾に\cmd{relax}が置かれている
+のはこれらの命令の後ろにたまたま``plus''などの文字列が現れた際，それが伸長度や伸縮度を指定する
+意味に解釈されないようにするためである．
+
+1313行目に登場する\texttt{fill}は特殊な単位であり，簡単に言えば「無限」の長さを表現する．
+因みに\texttt{fil}や\texttt{filll}という単位も存在し，\texttt{l}の数が多いほどより強力な
+無限を表現する．
+
+\begin{question}
+1311行目の\preSub\verb|\hskip \z@skip|は\cmd{relax}ではだめなのか．
+\end{question}
+
+\begin{question}
+\cmd{hskip}と\cmd{kern}の使い分けはどのように行われているのか．
+\end{question}
+
+
+
+
+\end{document}

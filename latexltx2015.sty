@@ -1,0 +1,58 @@
+\newcommand{\latexltx}{
+  \lstset{%
+    language={[LaTeX]TeX},
+    basicstyle={\ttfamily\small},%
+    identifierstyle={\small},%
+    commentstyle={\small\color{gray}},%
+    keywordstyle={\small\bfseries},%
+    ndkeywordstyle={\small},%
+    stringstyle={\small\ttfamily},%
+    frame={tb},%
+    tabsize=2,%
+    breaklines=true,%
+    columns=[l]{fullflexible},%
+    numbers=left,%
+    xrightmargin=1zw,%
+    xleftmargin=3zw,%
+    numberstyle={\scriptsize},%
+    stepnumber=1,%
+    numbersep=1zw,%
+    lineskip=-0.5ex,%
+    belowskip=0.5ex%
+  }
+}
+\newcommand{\texsource}{
+  \lstset{%
+    language={[LaTeX]TeX},
+    basicstyle={\ttfamily\small},%
+    identifierstyle={\small},%
+    commentstyle={\small\color{gray}},%
+    keywordstyle={\small\bfseries},%
+    ndkeywordstyle={\small},%
+    stringstyle={\small\ttfamily},%
+    frame=none,%
+    tabsize=2,%
+    breaklines=true,%
+    columns=[l]{fullflexible},%
+    numbers=none,%
+    xrightmargin=1zw,%
+    xleftmargin=3zw,%
+    numberstyle={\scriptsize},%
+    stepnumber=1,%
+    numbersep=1zw,%
+    lineskip=-0.5ex,%
+    belowskip=0.5ex%
+  }
+}
+% ec-lmr10（T1-encoding）の 23 番は compwordmark
+\font\eclmr=ec-lmr10
+\def\preSub{{\eclmr\char23}}
+% 23 番の欧文文字の前後の和欧文間空白を有効にする
+% OT1 の 23 番はアクセント用文字だから問題ないはず
+\xspcode23=3
+
+\newcommand{\cmd}[1]{\texttt{\def\{{\char`\{}\def\}{\char`\}}\texttt{\preSub\symbol{'134}}#1}}
+\newcommand{\syntax}[1]{\\ \hbox to\textwidth{\hss #1\hss}\\}
+\newcounter{qnum}
+\newenvironment{question}{\stepcounter{qnum}\paragraph{疑問\theqnum}}{}
+\newenvironment{answer}{\begin{screen}}{\end{screen}\vspace{1zh}}

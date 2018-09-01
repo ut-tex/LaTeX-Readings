@@ -1,0 +1,313 @@
+\documentclass[autodetect-engine,dvipdfmx]{jsarticle}
+
+\usepackage{okumacro}
+\usepackage[top=25truemm,bottom=25truemm,left=25truemm,right=25truemm]{geometry}
+\usepackage[dvipdfmx]{xcolor}
+\usepackage{ascmac}
+\usepackage{listings,jlisting}
+\usepackage{latexltx2015}
+
+\begin{document}
+
+\title{ latex.ltxリーディング \\ 第6回資料 }
+\author{ 東大\TeX 愛好会 }
+\date{2015年6月19日}
+\maketitle
+
+\section{繰り返し処理（前半）（朝倉）}
+
+今回および次回は，\LaTeX の内部命令のうち繰り返し処理に関するものを扱っていきたい．
+ひとまず今回は，\cmd{@whilenum}, \cmd{@whiledim}, \cmd{@whilesw}の3命令（以下，本資料では
+これらを総称して\cmd{@while}系命令と呼ぶことにする）を扱うことにする．
+\texttt{latex.ltx}を覗く前に，これらの命令の使用法を確認しておく．
+
+\subsection{\cmd{@while}系命令の使い方}\label{while系命令の使い方}
+
+\cmd{@whilenum}はカウンタレジスタが特定の条件を満たす間だけ繰り返しを実行する命令で，
+例えば次のようにして利用する．
+%
+\texsource
+\begin{lstlisting}
+\makeatletter
+\@tempcnta=\z@
+\@whilenum\@tempcnta<3\do{\advance\@tempcnta\@ne \the\@tempcnta}
+\makeatother
+\end{lstlisting}
+%
+これにより，紙面には``123''と印字されることになる．また，\cmd{@whiledim}はカウンタレジスタの
+代わりに寸法レジスタを用いて同様のことを実現する．
+
+次に\cmd{@whilesw}は，前々回の「\LaTeX の環境入門」で扱ったようなスイッチを終了判定に
+用いて繰り返し処理を行う命令である．
+%
+\begin{lstlisting}
+\makeatletter
+\newif\ifhappy
+\happytrue
+\@tempcnta=\z@
+\@whilesw\ifhappy\fi%
+  {\advance\@tempcnta\@ne \ifnum\@tempcnta=3 I'm tired. \happyfalse\else I'm happy. \fi}
+\makeatother
+\end{lstlisting}
+%
+これにより``I' m happy. I' m happy. I' m tired.''を得る．
+
+\subsection{\cmd{@whilenum}と\cmd{@whiledim}の実装}
+
+\cmd{@whilenum}と\cmd{@whiledim}は実装もほぼ同じなのでまとめて説明する．
+%
+\latexltx
+\begin{lstlisting}[firstnumber=846]
+\long\def\@whilenum#1\do #2{\ifnum #1\relax #2\relax\@iwhilenum{#1\relax
+     #2\relax}\fi}
+\long\def\@iwhilenum#1{\ifnum #1\expandafter\@iwhilenum
+         \else\expandafter\@gobble\fi{#1}}
+\long\def\@whiledim#1\do #2{\ifdim #1\relax#2\@iwhiledim{#1\relax#2}\fi}
+\long\def\@iwhiledim#1{\ifdim #1\expandafter\@iwhiledim
+        \else\expandafter\@gobble\fi{#1}}
+\end{lstlisting}
+%
+846, 847行目が\cmd{@whilenum}の定義となっている．\cmd{@whilenum}の書式は
+\ref{while系命令の使い方}節で確認したように，
+\syntax{\cmd{@whilenum}\texttt{〈条件式〉}\cmd{do}\texttt{\{〈繰り返す処理〉\}}}
+であるが，846行目のパラメータテキストを見ると，\verb|#1|が\texttt{〈条件式〉}，
+\verb|#2|が\texttt{〈繰り返す処理〉}であることがわかる．したがって，\cmd{@whilenum}の定義
+内部を見やすいように書き下すと，次のようになる．
+%
+\texsource
+\begin{lstlisting}
+\ifnum 〈条件式〉 \relax
+  〈繰り返す処理〉 \relax
+  \@iwhilenum{ 〈条件式〉 \relax 〈繰り返す処理〉 \relax}
+\fi
+\end{lstlisting}
+%
+はじめに与えられた\texttt{〈条件式〉}が，最初から「満たされないもの」（偽）であった場合，
+上の定義から\cmd{@whilenum}は何もせずに終了する．逆に，はじめに与えられた\texttt{〈条件式〉}が
+「満たされるもの」（真）であった場合，\texttt{〈繰り返す処理〉}が一度実行されたあと，
+残りの処理は\cmd{@iwhilenum}に引き継がれている．
+
+次に，\cmd{@iwhilenum}の定義内部を考える．\cmd{@iwhilenum}の引数は1つだけであり，さきほど
+\cmd{@whilenum}の定義内部で\verb|{〈条件式〉\relax〈繰り返す処理〉\relax}|が渡されている
+ことがわかった．したがって，\cmd{@iwhilenum}の定義内部を見やすいように書き下すと，
+次のようになる．
+%
+\begin{lstlisting}
+\ifnum 〈条件式〉 \relax
+  〈繰り返す処理〉 \relax
+  \expandafter\@iwhilenum
+\else
+  \expandafter\@gobble
+\fi
+{ 〈条件式〉 \relax 〈繰り返す処理〉 \relax}
+\end{lstlisting}
+%
+最初の2行は\cmd{@whilenum}とまったく同一である．後半も\texttt{〈条件式〉}が真である場合には
+%
+\begin{lstlisting}
+  \@iwhilenum{ 〈条件式〉 \relax 〈繰り返す処理〉 \relax}
+\end{lstlisting}
+%
+に展開されることになるため，全体として\cmd{@whilenum}と同様になることがわかる．これにより，
+\texttt{〈条件式〉}が真である間\texttt{〈繰り返す処理〉}が繰り返されることが確認できる．
+
+逆に\texttt{〈条件式〉}が偽である場合，後半部分は次のように展開される．
+%
+\begin{lstlisting}
+  \@gobble{ 〈条件式〉 \relax 〈繰り返す処理〉 \relax}
+\end{lstlisting}
+%
+\cmd{@gobble}は引数を飲み込む\LaTeX のマクロで，\texttt{latex.ltx}の726行目で定義されている．
+関連する定義とともに，ここで記しておこう．
+%
+\latexltx
+\begin{lstlisting}[firstnumber=726]
+\long\def \@gobble #1{}
+\long\def \@gobbletwo #1#2{}
+\long\def \@gobblefour #1#2#3#4{}
+\end{lstlisting}
+%
+以上で，\texttt{〈条件式〉}が偽となると，それ以上繰り返しが起こらないことも確認できた．
+
+\cmd{@whiledim}も\cmd{@whilenum}のカウンタレジスタ用の命令（\cmd{ifnum}）が寸法レジスタ用の
+命令（\cmd{ifdim}）に置き換わる程度で，ほとんど違いがない．
+
+\begin{question}
+847行目，\verb|#2|のあとの\cmd{relax}はなぜ必要なのか．
+\end{question}
+
+\subsection{\cmd{@whilesw}の実装}
+
+定義は以下に示す通りである．
+%
+\begin{lstlisting}[firstnumber=853]
+\long\def\@whilesw#1\fi#2{#1#2\@iwhilesw{#1#2}\fi\fi}
+\long\def\@iwhilesw#1\fi{#1\expandafter\@iwhilesw
+        \else\@gobbletwo\fi{#1}\fi}
+\end{lstlisting}
+%
+これも\cmd{@whilenum}と\cmd{@whiledim}ほどではないがかなり類似した定義となっている．スイッチは
+それ自体が条件分岐機能と真偽情報を保持しているため，\cmd{@whilenum}と\cmd{@whiledim}よりも
+単純に定義することができている．
+
+\section{\cmd{newcommand}の動作（まとめ）（大門）}
+これまで何回かに渡って考えてきた，\cmd{newcommand}の動作についてまとめようと思う。そもそも\cmd{newcommand}の主要な機能として，
+
+\begin{itemize}
+\item 重複定義のチェック
+\item 第一引数のオプション化
+\item 引数に\cmd{par}を含めることの可否の操作（\cmd{def}でも\cmd{long}をつけるだけで大丈夫だけど…）
+\end{itemize}
+が挙げられるが，それぞれ
+
+\begin{itemize}
+\item 重複定義のチェック → \cmd{@argdef}中の\cmd{@ifdefinable}の働き
+\item 第一引数のオプション化 → \cmd{@newcommand}の展開で分岐する，\cmd{@xargdef}の働き
+\item 引数に\cmd{par}を含めることの可否の操作 → \cmd{@star@or@long}の働き
+\end{itemize}
+とであることがわかった。以降は，\cmd{renewcommand}，\cmd{DeclareRobustCommand}等の関連のある制御綴について考えていきたいと思う。
+
+\section{\cmd{renewcommand}の動作（大門）}
+
+制御綴を再定義する\cmd{renewcommand}の実装について考察していく。まずは，\texttt{latex.ltx}中の定義を載せる。
+\latexltx
+\begin{lstlisting}[firstnumber=639]
+\long\def\@reargdef#1[#2]{%
+  \@yargdef#1\@ne{#2}}
+\def\renewcommand{\@star@or@long\renew@command}
+\def\renew@command#1{%
+  \begingroup \escapechar\m@ne\xdef\@gtempa{{\string#1}}\endgroup
+  \expandafter\@ifundefined\@gtempa
+     {\@latex@error{\noexpand#1undefined}\@ehc}%
+     \relax
+  \let\@ifdefinable\@rc@ifdefinable
+  \new@command#1}
+\end{lstlisting}
+
+具体例を通じて考えていこう。以下のようなソースコードを処理するとする。
+\texsource
+\begin{lstlisting}
+\renewcommand{\ほげ}[1]{\TeX は#1です。}
+\end{lstlisting}
+
+上のコードを定義に従い，適宜展開・実行をしてゆくと次のようになる。
+
+\begin{lstlisting}
+   \renewcommand{\ほげ}[1]{\TeX は#1です。}
+
+-> \@star@or@long\renew@command{\ほげ}[1]{\TeX は#1です。}
+
+   （\@star@or@longの動作により，\l@ngrel@xに\longまたは\relaxが代入される）
+
+-> \renew@command{\ほげ}[1]{\TeX は#1です。}
+
+-> \begingroup \escapechar\m@ne\xdef\@gtempa{{\string\ほげ}}\endgroup
+   \expandafter\@ifundefined\@gtempa
+      {\@latex@error{\noexpand\ほげundefined}\@ehc}%
+      \relax
+   \let\@ifdefinable\@rc@ifdefinable
+   \new@command\ほげ[1]{\TeX は#1です。}
+\end{lstlisting}
+
+このコードを分析してみよう。まず，\cmd{begingroup}から始まるグループ内を考えてみる。\cmd{escapechar}とは，\cmd{string}で制御綴を文字トークンに展開する際のエスケープ文字（カテゴリーコード0の文字）を定める\TeX プリミティブの整数値であり，例えば
+\begin{lstlisting}
+\escapechar=63\relax
+\string\TeX
+\end{lstlisting}
+などすれば，以下はエスケープ文字として``\texttt{?}''（文字コード63）が使用されるため，実行結果は，
+
+?TeX
+
+となる。もちろん，\cmd{escapechar}のデフォルト値は92（文字``\verb|\|''の文字コード）である。
+
+ただし，今回のように，\cmd{escapechar}に0未満または256以上の値を設定すると，\cmd{string}による文字トークンへの展開の際，エスケープ文字として何も挿入されなくなる。従って，
+\begin{lstlisting}
+\begingroup \escapechar\m@ne\xdef\@gtempa{{\string\ほげ}}\endgroup
+\end{lstlisting}
+の実行により，（グローバルな制御綴として）\cmd{@gtempa}が``\texttt{\{ほげ\}}''と定義されることになる。\cmd{begingroup}と\cmd{endgroup}は，\cmd{escapechar}の値の変更による影響が，外部に漏れ出ないように存在していると考えられる。
+
+\begin{question}
+\cmd{@gtempa}を，``\texttt{ほげ}''でなく``\texttt{\{ほげ\}}''と定義している理由が分からない。
+\end{question}
+
+
+次の行の理解は容易い。\cmd{@ifundefined}により，制御綴\cmd{ほげ}（\cmd{@gtempa}を展開して得られる）が定義済みなのかどうか判定し，未定義である場合エラーを返す。
+
+定義済みであった場合，以降で使用される\cmd{@ifdefinable}の定義を，\cmd{renewcommand}用の\cmd{@rc@ifdefinable}で書き換え，\cmd{new@command}に進む。以下では，\cmd{renewcommand}の動作の追跡を一旦やめ，\cmd{@ifdefinable}系の実装をまず理解することにする。
+
+\section{\cmd{@ifdefinable}の動作（大門）}
+
+さて前節で話題になった\cmd{@rc@ifdefinable}の中身であるが，\texttt{latex.ltx}の関連部分を抜き出すと，以下のようになる。
+\latexltx
+\begin{lstlisting}[firstnumber=649]
+\long\def\@ifdefinable #1#2{%
+      \edef\reserved@a{\expandafter\@gobble\string #1}%
+     \@ifundefined\reserved@a
+         {\edef\reserved@b{\expandafter\@carcube \reserved@a xxx\@nil}%
+          \ifx \reserved@b\@qend \@notdefinable\else
+            \ifx \reserved@a\@qrelax \@notdefinable\else
+              #2%
+            \fi
+          \fi}%
+         \@notdefinable}
+\let\@@ifdefinable\@ifdefinable
+\long\def\@rc@ifdefinable#1#2{%
+  \let\@ifdefinable\@@ifdefinable
+  #2}
+\end{lstlisting}
+
+\cmd{@@ifdefinable}は，他の部分で別途定義されているわけでもなく，659行目が示す様に単なる\cmd{@ifdefinable}のコピーである。
+
+従って，\cmd{@rc@ifdefinable}の機能は，単に\cmd{@gobble}と等しいように思われる（今後より正確にその意味を理解できるのかもしれないが）。以下では，\cmd{@ifdefinable}自体の実装を考えていこう。
+
+まず，\cmd{newcommand}の実装などを参照することにより，\cmd{@ifdefinable}の用法は以下のようであると推定される。
+\texsource
+\begin{lstlisting}
+\@ifdefinable{<チェックしたい制御綴>}{<定義可能である場合に実行されるコード>}
+\end{lstlisting}
+
+このコードは比較的簡単に読んでいくことができる。まず冒頭の
+\begin{lstlisting}
+\edef\reserved@a{\expandafter\@gobble\string #1}
+\end{lstlisting}
+であるが，これは\cmd{string}で制御綴を文字トークンとして展開した後に，\cmd{@gobble}で冒頭のエスケープ文字を取り除くことにより，制御綴名そのものを\cmd{reserved@a}として得ている。
+
+次に，\cmd{@ifundefined}による分岐が入る。\cmd{reserved@a}として得た制御綴名が既に定義済みであった場合\cmd{@notdefinable}が，そうでない場合中括弧内のコードが展開される。ここで\cmd{@notdefinable}は1058行目で
+\latexltx
+\begin{lstlisting}[firstnumber=1058]
+\gdef\@notdefinable{%
+ \@latex@error{%
+   Command \@backslashchar\reserved@a\space
+   already defined.\MessageBreak
+   Or name \@backslashchar\@qend... illegal,
+   see p.192 of the manual}\@eha}
+\end{lstlisting}
+と定義されており，エラーを返す制御綴であることが分かる。
+
+さらにその後，\cmd{reserved@b}の定義に入る。\cmd{@carcube}の定義
+\begin{lstlisting}[firstnumber=582]
+\def\@carcube#1#2#3#4\@nil{#1#2#3}
+\end{lstlisting}
+を見る限り，考えている制御綴名が一文字（\cmd{@}など）である場合，
+\texsource
+\begin{lstlisting}
+\reserved@b <- @xx
+\end{lstlisting}
+の様に代入され，二文字（\cmd{hoge}など）である場合，
+\begin{lstlisting}
+\reserved@b <- hog
+\end{lstlisting}
+となるように考えられる。要するに，制御綴名の内，前3文字を抜き出した文字列（3文字以下の名前なら，末尾に適当に\texttt{x}を付け加えたもの）を\cmd{reserved@b}として得ている。
+
+また，その後に登場する\cmd{ifx}の条件分岐では，それぞれ\cmd{@qend}と\cmd{@qrelax}との一致を調べているが，793および794行目において，
+\latexltx
+\begin{lstlisting}[firstnumber=793]
+\edef\@qend{\expandafter\@cdr\string\end\@nil}
+\edef\@qrelax{\expandafter\@cdr\string\relax\@nil}
+\end{lstlisting}
+と定義されていることから分かるように，これは単純に制御綴名が\texttt{end}から始まらないか，\texttt{relax}という名では無いかをチェックしている。
+
+これら全ての条件分岐を切り抜けて初めて，この制御綴は定義可能と判断され，第二引数に相当する目的のコードが実行されるようになっている。
+
+
+\end{document}

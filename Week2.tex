@@ -1,0 +1,417 @@
+\documentclass[autodetect-engine,dvipdfmx]{jsarticle}
+
+\usepackage{okumacro}
+\usepackage[top=25truemm,bottom=25truemm,left=25truemm,right=25truemm]{geometry}
+\usepackage[dvipdfmx]{xcolor}
+\usepackage{ascmac}
+\usepackage{listings,jlisting}
+\usepackage{latexltx2015}
+
+\begin{document}
+
+\title{ latex.ltxリーディング \\ 第2回資料 }
+\author{ 東大\TeX 愛好会 }
+\date{2015年5月1日}
+\maketitle
+
+\section{\LaTeX 流カウンター入門（朝倉）}
+
+\LaTeX 流カウンターの機能は非常に重要である．たった1回のゼミでこれを網羅的に理解することは
+無理があるので，今回は\LaTeX 流カウンター周りの基本的な事項に絞って扱うことにする．
+
+なお，本節の執筆にあたっては『\LaTeXe マクロ作法』（藤田眞作）を参考にした．
+
+\subsection{\TeX 流カウンター}
+
+\LaTeX 流カウンターについて考察を始める前に，\TeX 流カウンターについて簡単に説明しておく．
+
+\subsubsection{既製のカウンター}
+
+\TeX には\cmd{count0}から\cmd{count9}までの10個のカウンターレジスターがユーザー用に用意
+されている．ただし，\cmd{count0}は\LaTeXe ではページ番号を格納するために使用されているので
+ユーザーが自由に利用することはできない．ほかのカウンターも種々のパッケージで使用されている
+可能性があるので無闇に使用しないほうが無難である．
+
+\subsubsection{カウンターの新設}
+
+\TeX 流カウンターを新設するためには\cmd{newcount}命令を用いて，次のように宣言する．
+\syntax{\cmd{newcount}\cmd{〈カウンター名〉}}
+ここで，\cmd{\kern-.5em〈カウンター名〉}はバックスラッシュから始まる制御綴の形をしていることに
+注意せよ．\cmd{newcount}により新設されるカウンターには\TeX の内部では番号が割り当てられ，
+\cmd{count\kern-.5em〈割り当て番号〉\kern-.4em}と\kern.2em\cmd{\kern-.5em〈カウンター名〉}は
+同義となる．割り当て番号は，\cmd{meaning}\cmd{\kern-.5em〈カウンター名〉}とすることで確認できる．
+
+また，次のようにすると割り当て番号を指定して\TeX 流カウンターを新設することも可能である．
+\texsource
+\begin{lstlisting}
+\countdef\TestCount=200
+\end{lstlisting}
+このとき\cmd{TestCount}と\cmd{count200}は同義となる．
+
+\subsubsection{カウンターの基本操作}
+
+以下では，一般の\TeX 流カウンターを\cmd{TeXcounter}と表すことにする．
+
+\paragraph{代入}
+\cmd{TeXcounter}に対して任意の数を代入するときには\verb|\TeXcounter=100|のように直接代入したい
+数字を等号で結んで指定すればよい．なお，この等号は省略することが可能であり，また間にスペースが
+あってもなくても同じ結果となる\footnote{ただし，\cmd{TeXcounter}が
+\cmd{count\kern-.5em〈割り当て番号〉\kern-.4em}の形をしているときは間に等号またはスペースの
+いずれかが必要である．}．
+
+\newpage
+
+\paragraph{出力}
+\cmd{TeXcounter}が保持している数値を出力させる場合には\cmd{the}\cmd{TeXcounter}または
+\cmd{number}\cmd{TeXcounter}とする．また，\cmd{romannumeral}\cmd{TeXcounter}とすると，
+カウンターの出力をローマ数字の形で得ることができる．
+
+\paragraph{加法と減法}
+\TeX 流カウンターの足し算は以下のような形で行う．
+\begin{lstlisting}
+\advance\TeXcounter by 3
+\end{lstlisting}
+\cmd{TeXcounter}のあとの\texttt{by}および空白は省略できる．また，加算する数値を
+負の値にすることで引き算を行うことも可能である．
+%
+% ---- (comment by @bd_gfngfn 2015/05/13) ----
+%  \advance\TeXcounter by 3
+%  はby以降の数値が“文字列”なので，
+%  3に後続するトークンは読み捨てられる，ということを追記するべきかと思います
+%  そしてこのような場合は \relax を置いて
+%  \advance\TeXcounter by3\relax
+%  とするのが無難かと思います
+%  \relax の代わりに改行文字による空白トークンを置いても問題ないのですが
+%  見づらいのであまり推奨しません
+%  参考：http://d.hatena.ne.jp/zrbabbler/20121125/1353802089
+% ---- ----
+%
+\paragraph{乗法と除法}
+掛け算と割り算については\cmd{advance}と同じ要領で，それぞれ\cmd{multiply}と\cmd{divide}を
+使用することで実現できる．
+
+\subsection{\LaTeX 流カウンターの基本操作コマンド}
+
+\subsubsection{\cmd{newcounter}命令}
+
+\LaTeX 流カウンターを新設する際には，\cmd{newcounter}を以下の書式で使用する．
+\syntax{\cmd{newcounter\{\ 〈カウンター名〉\}[〈親カウンター〉]}}
+ここで\texttt{〈カウンター名〉}にはバックスラッシュがつかないことに注意せよ．
+また\texttt{〈親カウンター〉}は既存の\LaTeX 流カウンターの名前で，新設されるカウンターは
+ここで指定された親カウンターに従属することになる（オプション）．カウンターの親子関係については，
+本資料の\ref{sect:カウンターの親子関係}節で解説する．
+
+\TeX 流カウンターの新設命令\cmd{newcount}はカウンターの作成機能しかもたないが，
+\LaTeX 流カウンターの新設命令は様々な機能をもっている．以下に，その機能を列挙する．
+\begin{enumerate}
+\item 指定された\texttt{〈カウンター名〉}と同名のカウンターがないかどうかチェックする．
+\item \texttt{〈カウンター名〉}で指定された名前の\LaTeX 流カウンター
+	（以下，\texttt{LaTeXcounter}）を新設する．
+\item \texttt{LaTeXcounter}の現在値を出力するための\cmd{theLaTeXcounter}を自動で定義．
+\item オプションで\texttt{〈親カウンター〉}が指定された場合，\texttt{LaTeXcounter}を
+	これに従属させる．
+\item 相互参照用の内部（\TeX 流）カウンターを新設する（今回は詳しくは扱わない）．
+\end{enumerate}
+
+さて，\cmd{newcounter}の機能を確認できたところで，いよいよその定義をみていくことにする．
+\latexltx
+\begin{lstlisting}[firstnumber=1819]
+\def\newcounter#1{%
+  \expandafter\@ifdefinable \csname c@#1\endcsname
+    {\@definecounter{#1}}%
+  \@ifnextchar[{\@newctr{#1}}{}}
+\end{lstlisting}
+ご覧のとおり，\texttt{@}を含む\LaTeX の内部命令だらけで，これだけ見ても何が行われているのか
+よくわからない．先に，一般性の高いものを説明してしまう．
+
+まず，\cmd{@ifdefinable}は与えられた制御綴（ここでは\verb|c@#1|）が定義可能なものであるかを
+判定し，「定義不可能」であればエラーを吐いて処理を終了する．そもそも「何が定義不可能なのか」
+ということも含め\cmd{@ifdefinable}に関する詳細は本節では扱わない．次に\cmd{@ifnextchar}は
+文字通り直後の第一引数（ここでは\texttt{[}\space）が続いている場合は第二引数の処理
+（ここでは\verb|{\@newctr{#1}}|），続いていない場合は第三引数の処理（ここでは\verb|{}|）が
+実行される．\cmd{@ifdefinable}は今回の場合もそうであるように，オプションの有無で分岐を
+行う際によく用いられる便利な命令であるが，本節ではそのメカニズムまでは扱えない．
+
+さて，これまでの説明から先に示した機能のうち，1.は1820行目，4.は1822行目が担っているだろうことが
+推測できるだろう．裏を返せば，残りの3機能についてはすべて1821行目にある\cmd{@definecounter}が
+担っていることがわかる．では，次はこの\cmd{@definecounter}の内部について詳しく調べていくことに
+する．
+
+\newpage
+
+\begin{lstlisting}[firstnumber=1834]
+\def\@definecounter#1{\expandafter\newcount\csname c@#1\endcsname
+  \setcounter{#1}\z@
+  \global\expandafter\let\csname cl@#1\endcsname\@empty
+  \@addtoreset{#1}{@ckpt}%
+  \global\expandafter\let\csname p@#1\endcsname\@empty
+  \expandafter
+  \gdef\csname the#1\expandafter\endcsname\expandafter
+    {\expandafter\@arabic\csname c@#1\endcsname}}
+\end{lstlisting}
+
+念のため確認しておくと（1821行目から）\cmd{@definecounter}に渡される\verb|#1|は
+\texttt{LaTeXcounter}である．すると，\cmd{@definecounter}の定義の冒頭（1834行目）で
+\cmd{c@LaTeXcounter}という名の\TeX 流カウンターが\cmd{newcount}命令\linebreak によって
+新設されていることが読み取れる．この\cmd{c@LaTeXcounter}が，\LaTeX 流カウンター
+\texttt{LaTeXcounter}の実態である．そのため，\LaTeX 流カウンターを\TeX 流カウンターに
+変換するコマンドである\cmd{value}は\texttt{latex.ltx}の1823行目で以下のように定義されている．
+
+\begin{lstlisting}[firstnumber=1823]
+\def\value#1{\csname c@#1\endcsname}
+\end{lstlisting}
+
+\cmd{@definecounter}の定義に戻ると，1835行目では\cmd{setcounter}を用いて
+\texttt{LaTeXcounter}に0が代入されている．
+
+その下の1836と1838行目はかなり似ている．これらの末尾に登場する\cmd{@empty}は122行目にて
+\verb|\def\@empty{}|と定義されていることからわかるように「\ruby{空}{から}の制御綴」であり
+\footnote{プリミティブ\cmd{relax}と同じと考えて差し支えないのではなかろうか．}，
+それぞれ\cmd{cl@LaTeXcounter}と\cmd{p@LaTeXcounter}を，制御綴の代入に用いられる
+プリミティブ\cmd{let}で\ruby{空}{から}にしている．ここで，\cmd{p@LaTeXcounter}は
+相互参照に用いる内部（\TeX 流）カウンターなので今回はこれ以上扱わない．
+一方，\cmd{cl@LaTeXcounter}と1836・1837行目の内容はカウンターの親子関係に
+関するものであるので，次節で詳しく取り上げることにする．
+
+最後に残った1840・1841行目は，\texttt{LaTeXcounter}の現在値を出力する\cmd{theLaTeXcounter}
+命令の定義である．\verb|\csname hoge\endcsname|の形を用いているので\cmd{expandafter}が大量に
+必要とされ読みずらくなっているが，\verb|#1|を\texttt{LaTeXcounter}に置き換え，通常の
+バックスラッシュから始まる制御綴の形で書くのであれば
+\texsource
+\begin{lstlisting}
+\gdef\theLaTeXcounter{\@arabic\c@LaTeXcounter}
+\end{lstlisting}
+となるはずである．なお，\cmd{@arabic}は「渡された\TeX 流カウンターの値をアラビア数字で
+出力する制御綴」だが，1849行目にある定義は\verb|\def\@arabic#1{\number #1}|と素朴である．
+
+\begin{question}
+カウンター関連の制御綴の定義に\cmd{global}（\cmd{gdef}を含む）が頻出するのはなぜか．
+\end{question}
+\begin{answer}
+カウンターは原則として文書全体を通して一意的であることが望まれる．したがって，局所化された
+部分の中でカウンターが操作（新設や値の変更など）されたとしても，全体に対してその操作が影響を
+もち続けられるようにする必要があり，\cmd{global}を多用することになる．
+\end{answer}
+
+\begin{question}
+1840行目の\cmd{endcsname}の前にある\cmd{expandafter}が余計に感じられるが，どういうことか．
+\end{question}
+
+\newpage
+
+\subsubsection{\cmd{setcounter}命令と\cmd{addtocounter}命令}
+
+よく知られている通り，\cmd{setcounter}は\LaTeX 流カウンターに任意の整数を代入するコマンド，
+\cmd{addtocounter}は\LaTeX 流カウンターに任意の整数を可算するコマンドである．まずはその定義を
+示しておく．
+\latexltx
+\begin{lstlisting}[firstnumber=1811]
+\def\setcounter#1#2{%
+  \@ifundefined{c@#1}%
+    {\@nocounterr{#1}}%
+    {\global\csname c@#1\endcsname#2\relax}}
+\def\addtocounter#1#2{%
+  \@ifundefined{c@#1}%
+    {\@nocounterr{#1}}%
+    {\global\advance\csname c@#1\endcsname #2\relax}}
+\end{lstlisting}
+
+これらの定義はいずれも難しくない．だが本題に入る前に1812・1826行目に登場している
+\cmd{@ifundefined}という\LaTeX の便利な内部コマンドについて解説しておく．
+\cmd{@ifundefined}は文字通り，制御綴が定義されているか否かで分岐を行うためのコマンドで，
+以下のような形で用いられる\footnote{第1引数の\texttt{〈調べたい制御綴〉}は，正確には
+「調べたい制御綴から先頭のバックスラッシュを取り除いたもの」である．}．
+\syntax{\cmd{@ifundefined}\texttt{\{\ 〈調べたい制御綴〉\}
+	\{〈未定義だった場合の処理〉\}\{〈定義済みだった場合の処理〉\}}}
+このコマンドは，ユーザーがマクロを作成する際にも役立つだろうことが容易に推測できるだろう．
+では，どのようにしてこのようなことを実現しているのだろうか．\texttt{latex.ltx}の
+定義は以下のようになっている．
+\begin{lstlisting}[firstnumber=788]
+\def\@ifundefined#1{%
+  \expandafter\ifx\csname#1\endcsname\relax
+    \expandafter\@firstoftwo
+  \else
+    \expandafter\@secondoftwo
+  \fi}
+\end{lstlisting}
+ここで登場する\cmd{ifx}は続く2つのトークンが同値であるかどうかで条件分岐するプリミティブ
+である．今回のように後ろに続くトークンが制御綴トークンであった場合にはそれぞれの「意味」が
+同じかどうかで条件分岐する．また，ここに登場する\cmd{@firstoftwo}と\cmd{@secondoftwo}は
+文字通りの機能をもつ\LaTeX の内部命令で，その定義は極めて単純である．
+\begin{lstlisting}[firstnumber=105]
+\long\def\@firstoftwo#1#2{#1}
+\long\def\@secondoftwo#1#2{#2}
+\end{lstlisting}
+
+さて，\cmd{@ifundefined}の定義で鍵となるのは\verb|\csname hoge\endcsname|の挙動である．
+これは，基本的には（カテゴリーコードの問題を除けば）\cmd{hoge}と同義であるが，\cmd{hoge}が
+未定義の場合，単に\cmd{hoge}とソースに記述した場合（当然，エラーになる）と異なる動きをする．
+すなわち，\cmd{hoge}が未定義の状態で\verb|\csname hoge\endcsname|が展開されると\cmd{relax}
+として働く．そのことを把握していれば，789行目のからくりはそれ以上詳しく説明しなくても
+わかるだろう．
+
+話を\cmd{setcounter}と\cmd{addtocounter}の定義に戻そう．\cmd{@ifundefined}によって分岐された
+処理のうち，\texttt{〈定義済みだった場合の処理〉}についてはさほど追加の説明を必要と
+しないだろう．見ての通り\LaTeX 流カウンターの実態である\TeX 流カウンター
+\cmd{c@LaTeXcounter}が操作されている．また，これらの末尾に\cmd{relax}があるのは，直後に数値等
+がきた場合にも，目的通りの処理が実行されるようにするための工夫だろうと思われる．
+
+最後に残ったのは\texttt{〈未定義だった場合の処理〉}の中に登場する\cmd{@nocounterr}である．
+\begin{lstlisting}[firstnumber=1067]
+\gdef\@nocounterr#1{%
+  \@latex@error{No counter '#1' defined}\@eha}
+\end{lstlisting}
+今回\cmd{@latex@error}の定義までは遡らないが，そこまでしなくても
+「\texttt{No counter 'LaTeXcounter' defined}」\linebreak
+というエラーを出力するだろうことは簡単に推測できる．
+
+
+\section{\cmd{c@page}周辺に関して（谷口）}
+まず以下に\texttt{latex.ltx}中の\cmd{c@page}周辺の定義を掲載する．
+これは\texttt{ltpageno.dtx}由来となっている．
+
+\latexltx
+\begin{lstlisting}[firstnumber=3851]
+\countdef\c@page=0 \c@page=1
+\def\cl@page{}
+\def\pagenumbering#1{\%
+  \global\c@page \@ne \gdef\thepage{\csname @#1\endcsname
+   \c@page}}
+\end{lstlisting}
+
+\subsection{\cmd{c@page}に関して}
+まずページ数を表すレジスターである\cmd{count0}で\cmd{c@page}を定義した上で，ここに初期値1を代入している．
+
+\begin{question}
+\cmd{count0}と\cmd{cl@page}を動かしている命令はどこのファイルに記述されているのか．
+また，どのように制御されているのか． %頑張って調べてるけど見つからなくて辛いです，教えてください・・・
+\end{question}
+
+\subsection{\cmd{pagenumbering}に関して}
+\cmd{pagenumbering}を用いることで，ページ番号のスタイルを変更することが可能である．
+
+ここで例えばページ番号のスタイルとして\cmd{roman}を指定したとすれば，まず\verb|\csname @#1\endcsnamec@page|により以下の\cmd{@roman}が呼び出されてその引数として\cmd{c@page}がとられる．
+
+\begin{lstlisting}[firstnumber=1850]
+\def\@roman#1{\romannumeral #1}
+\end{lstlisting}
+
+\begin{question}
+なぜ直接\TeX プリミティブの\cmd{romannumeral}を呼び出さずに，一旦\cmd{@roman}を介するのか．
+\end{question}
+\begin{answer}
+書き換えを楽にするため．
+\end{answer}
+
+
+\section{mod（谷口）}
+整数論で用いられるmodには2種類存在し，一方は\cmd{pmod}で，もう一方は\cmd{bmod}で記述することができる．
+
+\subsection{modの使用例}
+高校等で扱われる合同式は\cmd{pmod}を用いて以下のように記述し，次の表示を得ることができる．
+
+\texsource
+\begin{lstlisting}
+a\equiv b\pmod{p}
+\end{lstlisting}
+
+\[
+a\equiv b\pmod{p}
+\]
+
+この式で整数$a$と$b$を$p$で割った余りが等しいことを示している．
+
+また，二項演算子としてのmodも存在し，\cmd{pmod}を用いて以下のように記述し，次の表示を得ることができる．
+
+\begin{lstlisting}
+a\bmod{p}b
+\end{lstlisting}
+
+\[
+a\bmod{p}b
+\]
+
+この式で整数$a$を$p$で割った余りが$b$であることを示している．\footnote{$a\bmod{p}b\iff a\equiv b\pmod{p}$は成立するが，逆は成り立たない．}
+
+
+\subsection{\cmd{pmod}の定義}
+\cmd{pmod}は\texttt{ltmath.dtx}由来で以下のように定義されている．
+
+\latexltx
+\begin{lstlisting}[firstnumber=4098]
+\def\pmod#1{%
+  \allowbreak\mkern18mu({\operator@font mod}\,\,#1)}
+\end{lstlisting}
+
+本定義で用いられている命令を一つずつ見ていこう．
+
+まず1つ目に用いられている命令は\cmd{allowbreak}であり，これは\texttt{latex.ltx}上で定義されている．
+
+\begin{lstlisting}[firstnumber=470]
+\def\allowbreak{\penalty \z@}
+\end{lstlisting}
+
+ここで，\cmd{penalty}は\TeX プリミティブであり，続く
+また，\cmd{z@}は\texttt{latex.ltx}上で以下のように定義された寸法であり，0ptを表している．
+
+\begin{lstlisting}[firstnumber=354]
+\newdimen\z@ \z@=0pt % can be used both for 0pt and 0
+\end{lstlisting}
+
+続いて\cmd{mkern}は\TeX プリミティブであり，引き続く長さのkernを挿入する．
+ここで，muは18emに等しく，em単位ではなくmu単位で長さを指定しなければならない．
+
+続いて，\cmd{operator@font}は\verb|\mathgroup\symoperators|で定義されていて，更に，\cmd{mathgroup}は\cmd{fam}で，\cmd{symoperators}は\cmd{char"0}で定義されている．
+また，\cmd{fam}は\TeX プリミティブであり，数式モード中で使うフォントファミリーを指定している．
+
+\subsection{一般のオペレーターの定義}
+\texttt{ltmath.dtx}中で定義された他の大抵のオペレーターはほぼ同様に定義されている．
+その例として\cmd{log}の定義を掲載する．
+
+\begin{lstlisting}[firstnumber=4062]
+\def\log{\mathop{\operator@font log}\nolimits}
+\end{lstlisting}
+
+ここで，\cmd{mathop}は\TeX プリミティブであり，\cmd{mathop}の引数の前後に適切な余白を空ける．
+また，\cmd{nolimits}は\TeX プリミティブであり，添字を下ではなく右下につけるよう設定している．
+
+\begin{question}
+\cmd{pmod}の定義に関して，\cmd{log}等の定義を踏襲して，以下のように記述することで，\cmd{pmod}と同様な出力を得ることができる．
+
+\texsource
+\begin{lstlisting}
+\allowbreak\mkern18mu(\mathop{\operator@font mod}\,p)
+\end{lstlisting}
+
+ここで，余白調節のために\cmd{,}を一つ抜いてある．
+なぜこのように\cmd{mathop}を用いずに定義しているのか．
+\end{question}
+
+
+
+%\subsection{\cmd{bmod}の定義}
+%\cmd{bmod}は\texttt{ltmath.dtx}由来で以下のように定義されている．
+%
+%\begin{lstlisting}[firstnumber=4094]
+%\def\bmod{%
+%  \nonscript\mskip-\medmuskip\mkern5mu%
+%  \mathbin{\operator@font mod}\penalty900\mkern5mu%
+%  \nonscript\mskip-\medmuskip}
+%\end{lstlisting}
+%
+%\begin{question}
+%\texttt{amsmath.dtx}内において，以下のように\texttt{latex.ltx}内と同じ内容で\cmd{bmod}が再定義されている．なぜか．
+%改行の位置や\%の有無が異なるが，\texttt{latex.ltx}内の定義では何か問題があるのだろうか．
+%\texsource
+%\begin{lstlisting}
+%\renewcommand{\bmod}{\nonscript\mskip-\medmuskip\mkern5mu\mathbin
+%  {\operator@font mod}\penalty900
+%  \mkern5mu\nonscript\mskip-\medmuskip}
+%\end{lstlisting}
+%\end{question}
+
+
+
+
+
+\end{document}

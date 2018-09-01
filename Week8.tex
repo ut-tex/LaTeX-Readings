@@ -1,0 +1,481 @@
+\documentclass[autodetect-engine,dvipdfmx]{jsarticle}
+
+\usepackage{okumacro}
+\usepackage[top=25truemm,bottom=25truemm,left=25truemm,right=25truemm]{geometry}
+\usepackage[dvipdfmx]{xcolor}
+\usepackage{ascmac}
+\usepackage{listings,jlisting}
+\usepackage{latexltx2015}
+
+\begin{document}
+
+\title{ latex.ltxリーディング \\ 第8回資料 }
+\author{ 東大\TeX 愛好会 }
+\date{2015年11月9日}
+\maketitle
+
+
+
+\section{エラーメッセージまわりその１（大浦）}
+
+\texttt{lterror.dtx}に由来する部分を読んでいく。長いので，すこしずつ。今日は定義の前半部を掲載するが，この全部を読み切ろうというわけでもない。すこしずつ，続けられるペースで読んでいきたいから...
+
+\subsection{定義(Part 1)}
+
+
+\latexltx
+\begin{lstlisting}[firstnumber=877]
+\expandafter\let\csname ver@autoerr.sty\endcsname\fmtversion
+\let\MessageBreak\relax
+\DeclareRobustCommand{\GenericInfo}[2]{%
+   \begingroup
+      \def\MessageBreak{^^J#1}%
+      \set@display@protect
+      \immediate\write\m@ne{#2\on@line.}%
+   \endgroup
+}
+\DeclareRobustCommand{\GenericWarning}[2]{%
+   \begingroup
+      \def\MessageBreak{^^J#1}%
+      \set@display@protect
+      \immediate\write\@unused{^^J#2\on@line.^^J}%
+   \endgroup
+}
+\bgroup
+\lccode`\@=`\ %
+\lccode`\~=`\ %
+\lccode`\}=`\ %
+\lccode`\{=`\ %
+\lccode`\T=`\T%
+\lccode`\H=`\H%
+\catcode`\ =11\relax%
+\lowercase{%
+\egroup%
+\dimen@\ifx\@TeXversion\@undefined4\else\@TeXversion\fi\p@%
+\ifdim\dimen@>3.14\p@%
+\DeclareRobustCommand{\GenericError}[4]{%
+\begingroup%
+\immediate\write\@unused{}%
+\def\MessageBreak{^^J}%
+\set@display@protect%
+\edef%
+\@err@                                                                 %
+{{#4}}%
+\errhelp
+\@err@                                                                 %
+\let
+\@err@                                                                 %
+\@empty
+\def\MessageBreak{^^J#1}%
+\def~{\errmessage{%
+#2.^^J^^J%
+#3^^J%
+Type  H <return>  for immediate help%
+\@err@                                                                 %
+}}%
+~%
+\endgroup}%
+\else%
+\DeclareRobustCommand{\GenericError}[4]{%
+\begingroup%
+\immediate\write\@unused{}%
+\def\MessageBreak{^^J}%
+\set@display@protect%
+\edef%
+\@err@                                                                 %
+{{#4}}%
+\errhelp
+\@err@                                                                 %
+\let
+\@err@                                                                 %
+\errmessage
+\def\MessageBreak{^^J#1}%
+\def~{\typeout{! %
+#2.^^J^^J%
+#3^^J%
+Type  H <return>  for immediate help.}%
+\@err@                                                                 %
+{}}%
+~%
+\endgroup}%
+\fi}%
+\end{lstlisting}
+
+\subsection{定義冒頭}
+
+\latexltx
+\begin{lstlisting}[firstnumber=877]
+\expandafter\let\csname ver@autoerr.sty\endcsname\fmtversion
+\let\MessageBreak\relax
+\end{lstlisting}
+
+877行目は，\cmd{ver@autoerr.sty}というコマンドを\cmd{fmtversion}の別名として定義しているだけである。
+
+878行目は，あとで散々出てくる\cmd{MessageBreak}にとりあえず\cmd{relax}を代入して備えているだけである。あとから\cmd{MessageBreak}には色々なものが代入される。\cmd{MessageBreak}は，その名の通り，（エラー）メッセージ同士の区切りにどのようなものを使うかということである。
+
+\subsection{GenericInfo}
+
+\latexltx
+\begin{lstlisting}[firstnumber=879]
+\DeclareRobustCommand{\GenericInfo}[2]{%
+   \begingroup
+      \def\MessageBreak{^^J#1}%
+      \set@display@protect
+      \immediate\write\m@ne{#2\on@line.}%
+   \endgroup
+}
+\end{lstlisting}
+
+ここで定義されるコマンドは，\cmd{GenericInfo}である。これを，引数を二つ取る堅牢なコマンドとして定義する。その中身はというと，さっき用意した\cmd{MessageBreak}として\preSub\verb|^^J#1|\preSub，つまり改行＋第一引数を指定し，\cmd{set@display@protect}を実行し，すぐに\texttt{.log}ファイルに，\preSub\verb|#2\on@line.|\preSub を書くということである。\cmd{m@ne}は第７回資料にある通り，マイナス１のことであり，\cmd{write}の後に負の数が来た場合には\cmd{write}の第二引数は\texttt{.log}ファイル送りになるので，このような挙動を示す。
+
+\cmd{set@display@protect}については，別途\texttt{latex.ltx}に定義がある。
+
+\latexltx
+\begin{lstlisting}[firstnumber=763]
+\def\set@display@protect{\let\protect\string}
+\end{lstlisting}
+
+つまり，単に\cmd{protect}を，\cmd{string}の別名として定義する，という意味である。
+
+\subsection{GenericWarning}
+
+\latexltx
+\begin{lstlisting}[firstnumber=879]
+\DeclareRobustCommand{\GenericWarning}[2]{%
+   \begingroup
+      \def\MessageBreak{^^J#1}%
+      \set@display@protect
+      \immediate\write\@unused{^^J#2\on@line.^^J}%
+   \endgroup
+}
+\end{lstlisting}
+先ほどとの違いは，２点ある。１つめはわかりやすいところだが，表示されるメッセージの内容が，\preSub\verb|^^J#2\on@line.^^J|\preSub となり，先ほどより前後の改行が多いということである。２つめは，\cmd{m@ne}が\cmd{@unused}になっているということである。
+
+\cmd{@unused}は，\texttt{latex.ltx}の1339行目に次のようにして定義されている。
+
+\latexltx
+\begin{lstlisting}[firstnumber=879]
+\newwrite\@unused
+\end{lstlisting}
+
+そして，\cmd{newwrite}は，第７回資料で述べられたとおり，\cmd{newcount}系のコマンドであり，次のように定義されている。
+
+\latexltx
+\begin{lstlisting}[firstnumber=332]
+\def\newwrite{\alloc@7\write\chardef\sixt@@n}
+\end{lstlisting}
+
+また，ここに登場する\cmd{alloc@}は，次のように定義されているのであった。
+
+\latexltx
+\begin{lstlisting}[firstnumber=334]
+\def\alloc@#1#2#3#4#5{\global\advance\count1#1\@ne
+\ch@ck#1#4#2% make sure there's still room
+\allocationnumber\count1#1%
+\global#3#5\allocationnumber
+\wlog{\string#5=\string#2\the\allocationnumber}}
+\end{lstlisting}
+
+そして，ここに登場する\cmd{ch@ck}は，次のように定義されていた。
+
+\latexltx
+\begin{lstlisting}[firstnumber=334]
+\gdef\ch@ck#1#2#3{%
+\ifnum\count1#1<#2\else
+\errmessage{No room for a new #3}%
+\fi}
+\end{lstlisting}
+
+では，
+\texsource
+\begin{lstlisting}
+\newwrite\@unused
+\end{lstlisting}
+がどのように展開されていくのか追っていくことにしよう。
+
+\noindent 第一段階
+\texsource
+\begin{lstlisting}
+\alloc@7\write\chardef\sixt@@n\@unused
+\end{lstlisting}
+
+\noindent 第二段階
+\texsource
+\begin{lstlisting}
+\alloc@7\write\chardef\sixt@@n\@unused
+\end{lstlisting}
+
+\noindent 第三段階
+\texsource
+\begin{lstlisting}
+\global\advance\count17\@ne
+\ch@ck7\sixt@@n\write
+\allocationnumber\count17%
+\global\chardef\@unused\allocationnumber
+\wlog{\string\@unused=\string\write\the\allocationnumber}
+\end{lstlisting}
+
+\cmd{advance}が実行され,\cmd{count17}の値が1増える。\cmd{count17}の初期値は-1なので，ここで\cmd{count17}は0になることが多かろう。
+
+\noindent 第四段階
+\texsource
+\begin{lstlisting}
+\ifnum\count17<\sixt@@n\else
+\errmessage{No room for a new \write}%
+\fi
+\allocationnumber\count17%
+\global\chardef\@unused\allocationnumber
+\wlog{\string\@unused=\string\write\the\allocationnumber}
+\end{lstlisting}
+
+ここの\cmd{ifnum}で，現在割り当てようとしているレジスタの番号が，16より小さいかを判別し，これを超過するようであればエラーが出る。このチェックを通り抜けた場合，\cmd{allocationnumber}に今から割り当てるレジスタの番号を格納し，
+
+\texsource
+\begin{lstlisting}
+\global\chardef\@unused\allocationnumber
+\end{lstlisting}
+によって，レジスタに\cmd{@unused}を割り当てる。最後の\cmd{wlog}により，\texttt{.log}ファイルに\cmd{@unused}が定義されたことを書き込む。
+
+この構成方法からわかるとおり，\cmd{@unused}に入っている値は，0以上15以下の数である。
+
+\cmd{write}の第一引数として，負の数または15より大きい値が指定された時は\texttt{.log}ファイル送りになるので，\cmd{@unused}が上限値の15に達していた時でさえ\texttt{.log}ファイルに書き込まれ知らせてくれたりはしない。一方，\cmd{write}の第一引数として，0以上の数が指定された時にはターミナル送りになるので，今回は必ずターミナル送りとなる。そりゃユーザに対するWarningがターミナル送りにされなかったらそれは困るでしょう。
+
+\subsection{GenericError}
+
+InfoとWarningを見てきたが，次に大物のErrorである。Errorはタイプセットの流れを止めるわけだから，それこそ定義が大きくなるのは仕方がない話である。今日のところは，\cmd{GenericError}定義部のおおまかな構造を述べるにとどめ，詳細な定義は次回以降に述べることにする。定義を再掲しておくと，次のようになっている。本当に中かっこの数が一緒かどうか確かめるのでさえ一苦労である（当然ちゃんとあっているのだが）。
+
+\latexltx
+\begin{lstlisting}[firstnumber=893]
+\bgroup
+\lccode`\@=`\ %
+\lccode`\~=`\ %
+\lccode`\}=`\ %
+\lccode`\{=`\ %
+\lccode`\T=`\T%
+\lccode`\H=`\H%
+\catcode`\ =11\relax%
+\lowercase{%
+\egroup%
+\dimen@\ifx\@TeXversion\@undefined4\else\@TeXversion\fi\p@%
+\ifdim\dimen@>3.14\p@%
+\DeclareRobustCommand{\GenericError}[4]{%
+\begingroup%
+\immediate\write\@unused{}%
+\def\MessageBreak{^^J}%
+\set@display@protect%
+\edef%
+\@err@                                                                 %
+{{#4}}%
+\errhelp
+\@err@                                                                 %
+\let
+\@err@                                                                 %
+\@empty
+\def\MessageBreak{^^J#1}%
+\def~{\errmessage{%
+#2.^^J^^J%
+#3^^J%
+Type  H <return>  for immediate help%
+\@err@                                                                 %
+}}%
+~%
+\endgroup}%
+\else%
+\DeclareRobustCommand{\GenericError}[4]{%
+\begingroup%
+\immediate\write\@unused{}%
+\def\MessageBreak{^^J}%
+\set@display@protect%
+\edef%
+\@err@                                                                 %
+{{#4}}%
+\errhelp
+\@err@                                                                 %
+\let
+\@err@                                                                 %
+\errmessage
+\def\MessageBreak{^^J#1}%
+\def~{\typeout{! %
+#2.^^J^^J%
+#3^^J%
+Type  H <return>  for immediate help.}%
+\@err@                                                                 %
+{}}%
+~%
+\endgroup}%
+\fi}%
+\end{lstlisting}
+
+まず最初に，
+
+\latexltx
+\begin{lstlisting}[firstnumber=894]
+\lccode`\@=`\ %
+\lccode`\~=`\ %
+\lccode`\}=`\ %
+\lccode`\{=`\ %
+\lccode`\T=`\T%
+\lccode`\H=`\H%
+\catcode`\ =11\relax%
+\lowercase{%
+\egroup%
+\end{lstlisting}
+でおなじみの（？）カテゴリコード変更である。
+\cmd{lowercase}がでてくるあたりが\texttt{latex.ltx}らしい技巧ではなかろうか。
+
+
+\latexltx
+\begin{lstlisting}[firstnumber=903]
+\dimen@\ifx\@TeXversion\@undefined4\else\@TeXversion\fi\p@%
+\ifdim\dimen@>3.14\p@%
+\end{lstlisting}
+
+ここで，\TeX のバージョンが3.14より新しいかどうかを判別して，それによって\cmd{GenericError}の定義を変える条件分岐をしている。
+そして，残りは927行目の\cmd{else}で区切られて，それぞれの条件におけるエラー生成コマンドを定義しているのである。
+
+\section{\cmd{DeclareRobustCommand}の実装（大門）}
+
+生来的に保護付（natively-protected）なマクロを定義するための制御綴である，\cmd{DeclareRobustCommand}の実装を考えていく。
+
+\latexltx
+\begin{lstlisting}[firstnumber=738]
+\def\DeclareRobustCommand{\@star@or@long\declare@robustcommand}
+\def\declare@robustcommand#1{%
+   \ifx#1\@undefined\else\ifx#1\relax\else
+      \@latex@info{Redefining \string#1}%
+   \fi\fi
+   \edef\reserved@a{\string#1}%
+   \def\reserved@b{#1}%
+   \edef\reserved@b{\expandafter\strip@prefix\meaning\reserved@b}%
+   \edef#1{%
+      \ifx\reserved@a\reserved@b
+         \noexpand\x@protect
+         \noexpand#1%
+      \fi
+      \noexpand\protect
+      \expandafter\noexpand\csname
+         \expandafter\@gobble\string#1 \endcsname
+   }%
+   \let\@ifdefinable\@rc@ifdefinable
+   \expandafter\new@command\csname
+      \expandafter\@gobble\string#1 \endcsname
+}
+\def\x@protect#1{%
+   \ifx\protect\@typeset@protect\else
+      \@x@protect#1%
+   \fi
+}
+\def\@x@protect#1\fi#2#3{%
+   \fi\protect#1%
+}
+\end{lstlisting}
+\cmd{newcommand}または\cmd{renewcommand}の機能と共通する部分（第一引数の省略やアスタリスクの有無など）については，既にそれらの実装を調べた回の資料で示されているので，今回は制御綴の保護に関する部分を中心に考えていく。
+
+\subsection{具体例での展開追跡}
+
+具体例として，以下の\TeX ソースの展開・実行を追うことにする。
+\texsource
+\begin{lstlisting}
+
+\DeclareRobustCommand{\ほげ}{ふが}
+
+-> \@star@or@long\declare@robustcommand{\ほげ}{ふが}
+
+   （\@star@or@longの展開により，\let\l@ngrel@x\longが実行される）
+
+-> \declare@robustcommand{\ほげ}{ふが}
+
+-> \ifx#1\@undefined\else\ifx\ほげ\relax\else
+      \@latex@info{Redefining \string\ほげ}%
+   \fi\fi
+   \edef\reserved@a{\string\ほげ}%
+   \def\reserved@b{\ほげ}%
+   \edef\reserved@b{\expandafter\strip@prefix\meaning\reserved@b}%
+   \edef\ほげ{%
+      \ifx\reserved@a\reserved@b
+         \noexpand\x@protect
+         \noexpand\ほげ%
+      \fi
+      \noexpand\protect
+      \expandafter\noexpand\csname
+         \expandafter\@gobble\string\ほげ \endcsname
+   }%
+   \let\@ifdefinable\@rc@ifdefinable
+   \expandafter\new@command\csname
+      \expandafter\@gobble\string\ほげ \endcsname{ふが}
+\end{lstlisting}
+ここまでは簡単に展開されるので，この先の挙動を丁寧に考えていくことにする。
+
+まず最初の3行の\cmd{ifx}による分岐では\cmd{ほげ}が定義済みかどうかを調べ，定義済みであればRedefiningする旨を報告する作業をしている。その先では，\cmd{reserved@a}と\cmd{reserved@b}にそれぞれ制御綴名とその置換えテキストを代入し，それらが一致するかどうかを比較している。
+
+\subsubsection{\cmd{reserved@a}と\cmd{reserved@b}の比較について}
+まず，\cmd{reserved@a}については，
+\begin{lstlisting}
+\edef\reserved@a{\string\ほげ}%
+\end{lstlisting}
+とあるように\preSub\verb|`\ほげ'|\preSub という制御綴名の文字列が代入される。対して\cmd{reserved@b}は，
+\begin{lstlisting}
+   \def\reserved@b{\ほげ}%
+   \edef\reserved@b{\expandafter\strip@prefix\meaning\reserved@b}%
+\end{lstlisting}
+とあるように，一旦\cmd{ほげ}そのものに等値した後，2行目の\cmd{edef}の部分で\cmd{ほげ}の置換えテキストを代入している。ここを理解するにはまず\cmd{meaning}の挙動を理解せねばならないが，\cmd{meaning}とは引数にとる制御綴の意味を表す文字列に展開される\TeX プリミティブで，具体例として
+\begin{lstlisting}
+\def\Are#1{#1 is Are.}
+\meaning\Are\par
+\meaning\@undefined
+\end{lstlisting}
+を実行すれば，出力として
+\begin{lstlisting}
+macro:#1->#1 is Are.
+undefined
+\end{lstlisting}
+が得られる。（特殊な設定をしない場合，\preSub\texttt{>}\preSub はフォントの問題で>と表示されると思われる。）
+
+また，\cmd{strip@prefix}とは\texttt{latex.ltx}に以下のように定義されている制御綴である。
+\begin{lstlisting}[firstnumber=129]
+\def\strip@prefix#1>{}
+\end{lstlisting}
+これは\cmd{meaning}の展開結果である文字列のうち，\texttt{macro}から\texttt{->}までの部分を取り除く働きを持つので，結局のところ\cmd{reserved@b}には置換えテキスト（または\texttt{`undefined'}）が代入されることになる。
+
+これらが，\cmd{ほげ}のが\cmd{edef}で定義される部分の中の\cmd{ifx}で比較されることになる。
+
+\begin{question}
+\cmd{reserved@a}と\cmd{reserved@b}が一致するのは，どのような状況なのだろうか。言い換えると，
+制御綴名とその置換えテキストが一致する場合とはどういう場合なのだろうか。
+
+\end{question}
+\subsubsection{\cmd{reserved@a}と\cmd{reserved@b}が一致しない場合}
+
+とりあえず\cmd{ifx}が偽である場合を考える。特に，新しい制御綴を宣言する際には\cmd{reserved@b}に\texttt{`undefined'}が代入されるので，こちらの場合に相当する。このとき，
+\begin{lstlisting}
+\edef\ほげ{%
+   \ifx\reserved@a\reserved@b
+      \noexpand\x@protect
+      \noexpand\ほげ%
+   \fi
+   \noexpand\protect
+   \expandafter\noexpand\csname
+      \expandafter\@gobble\string\ほげ \endcsname
+}%
+\end{lstlisting}
+の部分を（\cmd{edef}内であることに注意しながら）展開することにより，
+\begin{lstlisting}
+\ほげ <- \protect\ほげ 
+\end{lstlisting}
+という代入操作が得られる。\cmd{protect}のあとに続く\cmd{ほげ }は\cmd{ほげ}とは別物であることに注意されたい。\cmd{ほげ }は\cmd{ほげ}の直後に半角空白が続いている制御綴である。ただしこの時点では\cmd{ほげ }（半角空白が直後に続く制御綴）は\cmd{relax}と等価な状態である（これは\cmd{csname}の作用による）。
+
+続く以下の部分を再び示すと以下のようになる。
+\begin{lstlisting}
+\let\@ifdefinable\@rc@ifdefinable
+\expandafter\new@command\csname
+   \expandafter\@gobble\string\ほげ \endcsname{ふが}
+\end{lstlisting}
+ここは至って単純で，\cmd{ほげ}の代わりに\cmd{ほげ }（半角空白が直後に続く制御綴）に対して，\cmd{newcommand}で行われた作業を実施しているだけである。ただし\cmd{DeclareRobustCommand}では既存の定義の書き換えも想定されているので，定義可能かどうかを調べる制御綴に\cmd{renewcommand}用の\cmd{@rc@ifdefinable}を割り当てている。この先の挙動は過去に扱ったので省略する。
+
+結局のところ，\cmd{DeclareRobustCommand}は内部で半角空白が直後に続く制御綴\footnote{これは\cmd{def}などの普通の方法ではユーザーは定義できないので，衝突の可能性が低い。}を\cmd{newcommand}と同様に定義して，それに\cmd{protect}を被せる，という操作を行なっていると考えられる。
+
+\subsubsection{\cmd{reserved@a}と\cmd{reserved@b}が一致する場合}
+
+これについては次回考えることにする（時間ありませんでした…）。
+
+\end{document}

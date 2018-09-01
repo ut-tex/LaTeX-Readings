@@ -1,0 +1,295 @@
+\documentclass[autodetect-engine,dvipdfmx]{jsarticle}
+
+\usepackage[top=25truemm,bottom=25truemm,left=25truemm,right=25truemm]{geometry}
+\usepackage[dvipdfmx]{xcolor}
+\usepackage{ascmac}
+\usepackage{listings,jlisting}
+\usepackage{latexltx2015}
+
+\begin{document}
+
+\title{ latex.ltxリーディング \\ 第1回資料 }
+\author{ 東大\TeX 愛好会 }
+\date{2015年4月24日}
+\maketitle
+
+
+\section{\TeX のロゴたち（朝倉）}
+
+はじめに，\texttt{ltlogos.dtx}に由来するロゴ関連のコマンドの定義を記しておく．
+
+\latexltx
+\begin{lstlisting}[firstnumber=1327]
+\def\TeX{T\kern-.1667em\lower.5ex\hbox{E}\kern-.125emX\@}
+\DeclareRobustCommand{\LaTeX}{L\kern-.36em%
+  {\sbox\z@ T%
+    \vbox to\ht\z@{\hbox{\check@mathfonts
+      \fontsize\sf@size\z@
+      \math@fontsfalse\selectfont
+      A}%
+    \vss}%
+  }%
+  \kern-.15em%
+  \TeX}
+\DeclareRobustCommand{\LaTeXe}{\mbox{\m@th
+  \if b\expandafter\@car\f@series\@nil\boldmath\fi
+  \LaTeX\kern.15em2$_{\textstyle\varepsilon}$}}
+\end{lstlisting}
+
+本題に入る前に断っておくと，今回は上記定義に登場するフォント関連の部分についてはあまり深く
+立ち入らないことにする．したがって，\TeX の箱を用いた高さの調整が本節の最重要テーマとなる．
+
+\subsection{\TeX 出力コマンド}
+
+\cmd{TeX}の定義は（おそらく，伝統に従って）\cmd{def}で行われている
+\footnote{ただし，実際の文書で\cmd{meaning}\cmd{TeX}と展開すると\cmd{protect}\cmd{TeX}と
+なることから，別の場所で定義の書き換えが行われているらしい．}．
+その内部定義は極めてシンプルであり，ほとんど説明を必要としないであろう．念のため，
+いくつかのことを箇条書きで指摘しておく．
+
+\begin{itemize}
+\item \cmd{kern}は任意長の空白を挿入するプリミティブ
+\item \cmd{lower}は引き続く箱を任意長垂直方向に下げるプリミティブ
+	\footnote{垂直モードまたは数式モードでのみ使用可．したがって，続く\cmd{hbox}命令は必須．}
+\item \cmd{@}は\texttt{latex.ltx}の1307行目に\verb|\def\@{\spacefactor\@m}|と定義されている
+	\footnote{\cmd{meaning}\cmd{@}では\verb|\spacefactor 3000\space|と展開される．
+	\cmd{meaning}\cmd{@m}は\verb|\mathchar"3E8|と展開される．}
+\end{itemize}
+
+\begin{question}
+\cmd{@}の存在意義がよくわからない．
+\end{question}
+
+%\makeatletter
+%\noindent
+%T\kern-.1667em\lower.5ex\hbox{E}\kern-.125emX\@\\
+%T\kern-.1667em\lower.5ex\hbox{E}\kern-.125emX
+%\makeatother
+
+\newpage
+
+\subsection{\LaTeX 出力コマンド}
+
+\cmd{LaTeX}の定義部分のみを再掲する．
+
+\begin{lstlisting}[firstnumber=1328]
+\DeclareRobustCommand{\LaTeX}{L\kern-.36em%
+  {\sbox\z@ T%
+    \vbox to\ht\z@{\hbox{\check@mathfonts
+      \fontsize\sf@size\z@
+      \math@fontsfalse\selectfont
+      A}%
+    \vss}%
+  }%
+  \kern-.15em%
+  \TeX}
+\end{lstlisting}
+
+\cmd{LaTeX}の定義は\cmd{TeX}よりも些か複雑である．また，toc等への書き出し時にエラーとならない
+ように，はじめから\cmd{DeclareRobustCommand}で頑丈な制御綴として定義されている
+\footnote{\cmd{DeclareRobustCommand}の定義はかなり複雑なようなので，今回は取り扱わない．}．
+
+上の定義のうち\LaTeX のLおよび\TeX を出力する部分については何も難しくないと思うが，
+Aを出力する部分（1329〜1335行目）が少々問題である．ネストの外側から，順を追って見ていく
+ことにする．
+
+まず，はじめに登場する\cmd{sbox}は\cmd{savebox}の簡略化命令で，以下のような書式をもつ．
+\syntax{\cmd{sbox\{〈箱名称〉\}\{〈内容〉\}}}
+これは文字通り「箱を保存する」ための命令で，上記1329行目では\texttt{T}という文字を入れた
+\cmd{z@}という名前の箱が保存されている
+\footnote{保存された箱は\cmd{usebox}命令で出力することができる}．
+なお，この箱\cmd{z@}は1329〜1335行目で局所的に定義されていることがわかる．
+
+次に，1330〜1334行目は縦箱（\cmd{vbox}）の中に収められている．\cmd{vbox}は
+\syntax{\cmd{vbox to〈長さ〉}}
+の形で垂直方向の長さを指定することができるが，ここでは箱の高さを返すプリミティブ\cmd{ht}
+を用いてさきほど保存した箱\cmd{z@}の高さがその垂直方向の長さに指定されている．また，
+1334行目にある\cmd{vss}は垂直方向に無限に伸びるグルーを出力するプリミティブである．
+これにより\LaTeX のA（を含む横箱）はTの高さを突き破らない最も高い位置に出力されることになる．
+
+最後に，\cmd{hbox}の中身は（最後のAを除いて）すべてフォントに関する指定を行っている．
+\TeX/\LaTeX のフォント選択機構はかなり厄介なものであるので今回は深入りしないことにするが，
+ごく簡単に説明すると，\cmd{fontencoding}, \cmd{fontfamily}, \cmd{fontseries}, 
+\cmd{fontshape}, \cmd{fontsize}でそれぞれの指定を行った後に，最後に\cmd{selectfont}を
+宣言するという形をとる（これは\LaTeX 流の一法にすぎない）．見ての通り，この\LaTeX のAは
+使用文書の数式用のフォントに設定されている．
+
+\begin{question}
+なぜ，\LaTeX のうちAだけが細かいフォント指定を必要とするのだろうか．
+\end{question}
+\begin{answer}
+少なくとも，Aだけが他の文字より小さいサイズで出力されなければならないという事情がある．
+\end{answer}
+
+\newpage
+
+\subsection{\LaTeXe 出力コマンド}
+
+\cmd{LaTeXe}の定義部分のみを再掲する．
+
+\begin{lstlisting}[firstnumber=1338]
+\DeclareRobustCommand{\LaTeXe}{\mbox{\m@th
+  \if b\expandafter\@car\f@series\@nil\boldmath\fi
+  \LaTeX\kern.15em2$_{\textstyle\varepsilon}$}}
+\end{lstlisting}
+
+まず，\cmd{mbox}内冒頭の\cmd{m@th}は\texttt{latex.ltx}481行目に
+\verb|\def\m@th{\mathsurround\z@}|と定義されている命令である．\cmd{mathsurround}は
+数式モードから出入りする際に挿入されるグルーの長さを指定するプリミティブ
+\footnote{プリミティブであることは間違いないが，レジスタのように使用できる模様．}
+なので，\cmd{m@th}は数式モードとの境界にスペースを空けないようにする命令ということになる．
+
+そして，一番理解するのが難しいのが1339行目の内容である．まず，\cmd{@car}は\texttt{latex.ltx}の
+580行目に\verb|\def\@car#1#2\@nil{#1}|と定義されている．\cmd{f@series}は現在の
+フォントシリーズをアルファベット1,2文字で返す．特に，現在のフォントシリーズがボールドである
+場合にはである場合には，\texttt{b}または\texttt{bx}\footnote{bold extendedの略．}が返る．
+すなわち，\verb|\@car\f@series\@nil|全体は\texttt{m}（標準体の場合）または\texttt{b}
+（ボールド体の場合）に展開されるはずである．プリミティブの\cmd{if}は続く2つの文字トークンの
+文字コードが等しいかどうかで条件分岐を行うので1339行目のif文全体としては
+「もし，ボールド体で\LaTeXe が出力されようとしている場合は，数式用のボールド体で出力せよ」
+という指示を行っていることになる．因みに，\cmd{@nil}はどこにも定義されていない制御綴であり，
+\cmd{@car}においては単なる区切り記号として機能している（可変長引数へ対応するため）．
+
+1340行目の内容は説明することがほとんどない．さきほどの\cmd{m@th}命令が効いているので，
+2と$\textstyle\varepsilon$の間にグルーが挿入されてしまう心配はない．
+
+\begin{question}
+\cmd{LaTeXe}の定義全体が\cmd{mbox}で囲われているのはなぜか．
+\end{question}
+\begin{answer}
+途中での改行抑止または数式モードで使用された場合への対策か．また，局所化の役割も担っている．
+\end{answer}
+
+\begin{question}
+\cmd{@car}の名前の由来は何か．
+\end{question}
+\begin{answer}
+Lisp言語にリストの最初の要素を取り出すcar関数というものがあり，その由来は
+Contents of the Address part of the Register である．\LaTeX の\cmd{@car}もこれと
+同様であると考えられる．
+
+また，\cmd{@car}の定義の前後行に\cmd{@cons}と\cmd{@cdr}が定義されているが，これらも
+同様にLisp由来で，それぞれconstructとContents of the Decrement part of the Registerの
+略である．
+\end{answer}
+
+\newpage
+
+\section{\LaTeX におけるループ機能の実装（大門）}
+
+まず，\verb|\loop|および\verb|\repeat|の定義を示す．\texttt{ltdirchk.dtx}由来となっている．
+
+\begin{lstlisting}[firstnumber=101]
+\def\loop#1\repeat{\def\iterate{#1\relax\expandafter\iterate\fi}%
+  \iterate \let\iterate\relax}
+\let\repeat\fi
+\end{lstlisting}
+
+なお，450行目からも，全く同じ内容で再度\verb|\def|により定義がなされている．こちらは\verb|ltplain.dtx|由来の定義である．
+\begin{lstlisting}[firstnumber=450]
+\long\def \loop #1\repeat{%
+  \def\iterate{#1\relax  % Extra \relax
+               \expandafter\iterate\fi
+               }%
+  \iterate
+  \let\iterate\relax
+}
+\let\repeat=\fi
+\end{lstlisting}
+複数の.dtxファイルで別々に\verb|\loop|を定義しているにも関わらず，\texttt{latex.ltx}として１つのファイルに纏めてしまったため，このような状況になっているようだ．
+
+\subsection{\cmd{loop}の挙動}
+
+さて，この中身についてだが，以下では次のような例を用いてコードを理解していきたいと思う．
+
+\texsource
+\begin{lstlisting}
+\newcount\hoge
+\loop
+A
+\advance\hoge1
+\ifnum\hoge<2\repeat
+\end{lstlisting}
+
+まず確認だが，\verb|\loop|は\verb|\if|および\verb|\repeat|と組み合わせて使う．上の例では，1行目で定義されたカウンタ\verb|\hoge|が（\verb|\hoge|の初期値は0），4行目の\verb|\advance\hoge1|において1ずつ増加するようにしてある．5行目において，\verb|\hoge|が2よりも小さい間は\verb|\repeat|が作用し\verb|\loop|の位置に実行が戻り，ふただび文字Aを出力し，\verb|\hoge|が増加する．\verb|\hoge|が2以上になると，\verb|\repeat|が作用しなくなり作業が終了する．
+
+それでは詳しい挙動を調べていこう．1行目については，今回は特に気にかける必要はない．\verb|\hoge|というカウンタを用意しただけである．
+
+実行が2行目に移ったとき，\TeX は\verb|\loop|を展開し始める．いま，パターンマッチより，\verb|\loop#1\repeat|の引数\verb|#1|に相当する部分は，
+
+\begin{lstlisting}
+A
+\advance\hoge1
+\ifnum\hoge<2
+\end{lstlisting}
+
+となるから，展開後，上例は以下のようになる．
+
+\begin{lstlisting}
+\def\iterate{A\advance\hoge1\ifnum\hoge<2\relax\expandafter\iterate\fi}%
+  \iterate \let\iterate\relax
+\end{lstlisting}
+
+次に，\TeX は\verb|\def|を展開する．この作業により\verb|\iterate|に，
+
+\begin{lstlisting}
+A\advance\hoge1\ifnum\hoge<2\relax\expandafter\iterate\fi
+\end{lstlisting}
+
+が代入される．そのまま次に\verb|\iterate|が展開されるため，結局元のコードから
+
+\begin{lstlisting}
+A\advance\hoge1
+\ifnum\hoge<2\relax\expandafter\iterate\fi
+\let\iterate\relax
+\end{lstlisting}
+まで変容したことになる（見やすいように，適宜改行を施した）．
+
+さて，このコードの展開に入るが，まず序盤の\verb|A\advance\hoge1|は特に問題ない．文字Aが出力され，カウンタ\verb|\hoge|が1増加しただけである．次に，\verb|\ifnum\hoge<2|が読み込まれる．これは真であるから，\TeX は\verb|\else|または\verb|\fi|までのトークン列を展開し始める．まず\verb|\relax|では何もせず，次に\verb|\expandafter|を読み込み，\verb|\iterate|の前に\verb|\fi|を展開する．
+
+\begin{question}
+\verb|\expandafter\iterate\fi|の挙動（\TeX プリミティブである\verb|\fi|を展開するとき，\TeX はどのような動作をするのか）
+\end{question}．
+\begin{answer}
+（推察の域を出ないが）おそらく，\verb|\fi|を先に展開する（読み込む）ことにより，\TeX は\verb|\ifnum|より始まる条件分岐節が終了したとみなし，\verb|\if|節の外に\verb|\iterate|を展開すると思われる．従って，展開終了後のコードは次の通り．
+
+\begin{lstlisting}
+A\advance\hoge1  % この行は展開終了
+A\advance\hoge1\ifnum\hoge<2\relax\expandafter\iterate\fi
+\let\iterate\relax
+\end{lstlisting}
+2行目が，先ほどの\verb|\iterate|を展開したものである．
+\end{answer}
+
+再び2行目の展開に入る．\verb|A\advance\hoge1|を展開することで，文字Aを出力し，カウンタ\verb|\hoge|の値は2となった．そこで，今回は\verb|\hoge<2|が偽であるため，\TeX は\verb|\ifnum|から\verb|\fi|の部分までの展開をスキップする．最後に，一時的な入れ子として使用した\verb|\iterate|に\verb|\relax|をコピーして，動作が終了する．結果として，出力は\\
+\hspace{3zw}\fbox{AA}\\
+となるはずである．
+
+\subsection{\cmd{let}\cmd{repeat=}\cmd{fi}の意味}
+
+さて，最後に定義の103行目，\verb|\let\repeat=\fi|について考えてみたいと思う．前節で見たように，\verb|\loop|が展開される際，パターンマッチにより\verb|\repeat|は取り除かれてしまうため，この一文の必要性は分かりにくい．しかし，この定義は次のような例で生きてくる．
+\begin{lstlisting}
+\newcount\fuga
+\iffalse  % 必ず偽の場合を実行する命令．すなわち，このコードは7行目まで無視される．
+\loop
+ABC
+\advance\fuga1
+\ifnum\fuga<2\repeat
+\fi
+\end{lstlisting}
+この場合，2行目で\verb|\iffalse|を展開した\TeX は，以降\verb|\else|または\verb|\fi|を探しながら，それらに出会うまでトークンを展開せずに読み込んでいく．従って，今回は\verb|\loop|が展開されないため，\verb|\repeat|も除去されずに残ったままになる．しかし，6行目で\verb|\ifnum|を読み込んでしまった（展開はしていない）\TeX は，1階層下の条件分岐に突入したと判断し，以降は2回\verb|\fi|が登場するまで，全てのトークンを展開せずに読み込もうとしてしまう．
+
+従って，\verb|\let\repeat=\fi|と定義されていないと，\verb|\if|の個数と\verb|\fi|の個数が釣り合わずに，エラーとなってしまうのだ．この定義は，\verb|\loop|が展開されない場合に必要となってくる．
+
+
+
+
+
+
+
+
+
+
+
+
+\end{document}

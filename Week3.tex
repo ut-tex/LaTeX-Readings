@@ -1,0 +1,396 @@
+\documentclass[autodetect-engine,dvipdfmx]{jsarticle}
+
+\usepackage{okumacro}
+\usepackage[top=25truemm,bottom=25truemm,left=25truemm,right=25truemm]{geometry}
+\usepackage[dvipdfmx]{xcolor}
+\usepackage{ascmac}
+\usepackage{listings,jlisting}
+\usepackage{latexltx2015}
+
+\begin{document}
+
+\title{ latex.ltxリーディング \\ 第3回資料 }
+\author{ 東大\TeX 愛好会 }
+\date{2015年5月8日}
+\maketitle
+
+\section{\LaTeX 流カウンターの親子関係（朝倉）}
+
+前回は「\LaTeX 流カウンター入門」ということで，\LaTeX 流カウンターの基本的な3機能について
+検討した．今回は，その4つ目の機能である「\LaTeX 流カウンターの親子関係」について考える．
+
+\subsection{親カウンターと子カウンターの挙動}
+
+はじめに，そもそも「親子関係」とはどういうものなのか確認しておく．親子関係（従属関係）は
+子カウンターの定義時に設定され，以後親カウンターの値が1増えると，子カウンターの値は0にリセット
+されるようになる．この仕組みが利用されている身近な例としてsectionカウンターとsubsection
+カウンターがある．また，一つの親カウンターに複数の子カウンターが存在する場合もあり，この場合
+親カウンターの値が1増えると，すべての子カウンターの値が0にリセットされる必要がある．
+
+なお，以下では親カウンターを\texttt{LaTeXcounterP}，子カウンターを\texttt{LaTeXcounterC}で
+一般に表現するものとする．
+
+\subsection{\cmd{newcounter}の仕掛け}
+
+実際に「親カウンターの値が1増えると，子カウンターの値が0にリセットされる」仕組みを考える前に，
+\cmd{newcounter}命令で行われるそのための準備（仕掛け）を見ていく．前回の資料にも登場したが，
+ここでもう一度\cmd{newcounter}の定義箇所を掲載する．
+\latexltx
+\begin{lstlisting}[firstnumber=1819]
+\def\newcounter#1{%
+  \expandafter\@ifdefinable \csname c@#1\endcsname
+    {\@definecounter{#1}}%
+  \@ifnextchar[{\@newctr{#1}}{}}
+\end{lstlisting}
+
+このうち今回取り扱うのは最後の1行である．すなわち，\cmd{@ifnextchar}の分岐によって，
+「親カウンターが指定されたとき」のみ実行される\cmd{@newctr}の中身を覗き見ることになる．
+\begin{lstlisting}[firstnumber=1824]
+\def\@newctr#1[#2]{%
+  \@ifundefined{c@#2}{\@nocounterr{#2}}{\@addtoreset{#1}{#2}}}
+\end{lstlisting}
+
+説明が前回と重複する箇所については簡単に済ませるが，1825行目の前半部分は「指定された
+親カウンターが本当に存在しているかを調べ，存在しなかった場合はエラーを吐く」という動作をする．
+したがって，さらに追跡を要するのは\cmd{@addtoreset}命令のみとなる．
+
+\begin{lstlisting}[firstnumber=1842]
+\def\@addtoreset#1#2{\expandafter\@cons\csname cl@#2\endcsname {{#1}}}
+\end{lstlisting}
+
+ここで\cmd{cl@\dots}という前回も登場した形が気になる．これは，可変命令を含むリセットリスト
+である．ここでは\cmd{cl@LaTeXcounterP}となっていることから，親カウンターの（もつ）
+リセットリストであることがわかる．さて，「可変命令を含むリセットリスト」が果たして何なのか
+を理解するためにも\texttt{latex.ltx}の読解を続けたい．
+\begin{lstlisting}[firstnumber=579]
+\def\@cons#1#2{\begingroup\let\@elt\relax\xdef#1{#1\@elt #2}\endgroup}
+\def\@car#1#2\@nil{#1}
+\def\@cdr#1#2\@nil{#2}
+\end{lstlisting}
+
+今登場しているのは$\cmd{@cons}$だけだが，ついでなので\cmd{@car}と\cmd{@cdr}の定義もまとめて
+引用した．\cmd{@car}と\cmd{@cdr}はそれぞれリストの最初の要素と最後の要素
+\footnote{「要素」の定義は，\cmd{@car}と\cmd{@cdr}の定義を見るに「引数の取り方」のそれに
+一致するらしい．「引数の取り方」が「トークン化ルール」と一致しないことに注意．}
+を取り出す命令である（第1回資料の3ページも参照のこと）．
+
+一方の\cmd{@cons}はリストに新たな（可変命令付の）要素を加えるための命令である．その使用法を
+見やすくするため，先ほど登場した\cmd{@addtoreset}の定義の中身を見やすい形で書き直してみる．
+\texsource
+\begin{lstlisting}
+\@cons\cl@LaTeXcounterP{{LaTeXcounterC}}
+\end{lstlisting}
+続いて，ここから1回展開した形を書き下す（見やすいよう適宜改行とインデントを加えた）．
+\begin{lstlisting}
+\begingroup
+  \let\@elt\relax
+  \xdef\cl@LaTeXcounterP{\cl@LaTeXcounterP\@elt{LaTeXcounterC}}
+\endgroup
+\end{lstlisting}
+
+指摘するまでもなく気付くことかもしれないが，この\cmd{@elt}が可変命令である．先に種明かしを
+してしまうと，通常は\cmd{@elt}には\cmd{relax}が代入されており（上のコードの2行目），
+リセットリストに含まれるカウンターをリセットする際にこの\cmd{@elt}にカウンター値を0に
+リセットするための命令が代入され，実行される．
+
+後半に登場する\cmd{xdef}はもちろん\verb|\global\edef|の短縮形である．あとは特に説明を
+しなくても\cmd{@cons}がリストの末尾に新たな要素を加える命令であることがわかるだろう．
+
+\subsection{カウンター値の更新}
+
+\cmd{newcounter}で子カウンター\texttt{LaTeXcounterC}を新設する際に，親カウンターの
+リセットリスト\cmd{cl@LaTeXcounterP}に\cmd{@elt{LaTeXcounterC}}という可変命令付の要素が
+付加されるという「準備」が行われていることがわかったところで，いよいよ「親カウンターの値が
+1増えると，子カウンターの値が0にリセットされる」仕組みを見ていくことにする．これに該当する
+\LaTeX 流カウンターの更新命令は\cmd{stepcounter}と\cmd{refstepcounter}の2種類があるが，
+後者は相互参照に関わるものなので，今回は\cmd{stepcounter}のみを扱う．
+
+\latexltx
+\begin{lstlisting}[firstnumber=1826]
+\def\stepcounter#1{%
+  \addtocounter{#1}\@ne
+  \begingroup
+    \let\@elt\@stpelt
+    \csname cl@#1\endcsname
+  \endgroup}
+\def\@stpelt#1{\global\csname c@#1\endcsname \z@}
+\end{lstlisting}
+
+準備をしっかりと行ってきたので，この定義の解釈は特に難しくない．1827行目は前回扱った
+\cmd{addtocounter}命令を用いて，対象のカウンター（\texttt{LaTeXcounterP}）の値を
+1つ大きくしている．1828〜1831行目は可変命令\cmd{@elt}への制御綴代入の影響が外部に及ばない
+ように\cmd{begingroup}と\cmd{endgroup}で挟まれていて，その内部で行われていることは
+\cmd{@elt}に\cmd{@stpelt}を代入してリセットリスト\cmd{cl@LaTeXcounterP}を\kenten{実行}
+している．\cmd{@stpelt}は1832行目の定義を見ればわかる通り，引数に与えられたカウンターの
+値を0にするものであるので，これにより子カウンターが一斉にリセットされることになる．
+
+\newpage
+
+\section{\cmd{newcommand}の動作（大門）}
+
+\texttt{latex.ltx}のうち，\cmd{newcommand}に関連する部分を抜き出すと次のようになる。
+
+\latexltx
+\begin{lstlisting}[firstnumber=589]
+\def\@star@or@long#1{%
+  \@ifstar
+   {\let\l@ngrel@x\relax#1}%
+   {\let\l@ngrel@x\long#1}}
+\let\l@ngrel@x\relax
+\def\newcommand{\@star@or@long\new@command}
+\def\new@command#1{%
+  \@testopt{\@newcommand#1}0}
+\def\@newcommand#1[#2]{%
+  \kernel@ifnextchar [{\@xargdef#1[#2]}%
+                {\@argdef#1[#2]}}
+\long\def\@argdef#1[#2]#3{%
+   \@ifdefinable #1{\@yargdef#1\@ne{#2}{#3}}}
+\long\def\@xargdef#1[#2][#3]#4{%
+  \@ifdefinable#1{%
+     \expandafter\def\expandafter#1\expandafter{%
+          \expandafter
+          \@protected@testopt
+          \expandafter
+          #1%
+          \csname\string#1\endcsname
+          {#3}}%
+       \expandafter\@yargdef
+          \csname\string#1\endcsname
+           \tw@
+           {#2}%
+           {#4}}}
+\long\def\@testopt#1#2{%
+  \kernel@ifnextchar[{#1}{#1[{#2}]}}
+\def\@protected@testopt#1{%%
+  \ifx\protect\@typeset@protect
+    \expandafter\@testopt
+  \else
+    \@x@protect#1%
+  \fi}
+\long \def \@yargdef #1#2#3{%
+  \ifx#2\tw@
+    \def\reserved@b##11{[####1]}%
+  \else
+    \let\reserved@b\@gobble
+  \fi
+  \expandafter
+    \@yargd@f \expandafter{\number #3}#1%
+}
+\long \def \@yargd@f#1#2{%
+  \def \reserved@a ##1#1##2##{%
+    \expandafter\def\expandafter#2\reserved@b ##1#1%
+    }%
+  \l@ngrel@x \reserved@a 0##1##2##3##4##5##6##7##8##9###1%
+}
+\long\def\@reargdef#1[#2]{%
+  \@yargdef#1\@ne{#2}}
+\def\renewcommand{\@star@or@long\renew@command}
+\def\renew@command#1{%
+  \begingroup \escapechar\m@ne\xdef\@gtempa{{\string#1}}\endgroup
+  \expandafter\@ifundefined\@gtempa
+     {\@latex@error{\noexpand#1undefined}\@ehc}%
+     \relax
+  \let\@ifdefinable\@rc@ifdefinable
+  \new@command#1}
+\end{lstlisting}
+
+今回は幾つかの例を通じて，\cmd{newcommand}の動作について考えていく。
+
+\subsection{例1：アスタリスク・引数共に無い場合}
+
+\texsource
+\begin{lstlisting}
+\newcommand{\ほげ}{ふが}
+\end{lstlisting}
+
+上のソースコードは，まず\cmd{newcommand}（594行目）の展開により，
+\begin{lstlisting}
+\@star@or@long\new@command{\ほげ}{ふが}
+\end{lstlisting}
+となる。さらに\cmd{@star@or@long}（589行目）を展開すると，
+\begin{lstlisting}
+\@ifstar{\let\l@ngrel@x\relax\new@command}{\let\l@ngrel@x\long\new@command}{\ほげ}{ふが}
+\end{lstlisting}
+となる。今回はアスタリスクがついていないため，\cmd{@ifstar}の展開\footnote{詳細は本筋から外れるため割愛する。}により
+
+\begin{lstlisting}
+\let\l@ngrel@x\long\new@command{\ほげ}{ふが}
+\end{lstlisting}
+
+が得られる。これを展開することにより，\cmd{l@ngrel@x}に\cmd{long}が代入され（これは後ほど再登場する），続けて\cmd{new@command}（595行目）が展開されるため，
+
+\begin{lstlisting}
+\@testopt{\@newcommand\ほげ}0{ふが}
+\end{lstlisting}
+となる。\cmd{@testopt}は，616行目の定義を読めばわかる通り，引数の個数を指定する\texttt{[]}の有無を調べる制御綴となっている。従って，これの展開により，
+\begin{lstlisting}
+\kernel@ifnextchar[{\@newcommand\ほげ}{\@newcommand\ほげ[{0}]}{ふが}
+\end{lstlisting}
+が得られるが，今回は直後にトークン``\texttt{[}''が続いていいないため，\cmd{kernel@ifnextchar}（これは，800行目で別途\preSub\verb|\let\kernel@ifnextchar\@ifnextchar|と定義されている）の展開により次のようになる。
+\begin{lstlisting}
+\@newcommand\ほげ[0]{ふが}
+\end{lstlisting}
+これを597行目に従い素直に展開すると，
+\begin{lstlisting}
+\kernel@ifnextchar [{\@xargdef\ほげ[0]}{\@argdef\ほげ[0]}{ふが}
+\end{lstlisting}
+を得る。先ほどと同様に\cmd{kernel@ifnextchar}の展開を考えると，今回は\cmd{\@argdef}が読み込まれるため（ここの\cmd{kernel@ifnextchar}は，第一引数の規定値を定める\texttt{[]}の有無を調べている），展開後は
+\begin{lstlisting}
+\@argdef\ほげ[0]{ふが}
+\end{lstlisting}
+であり，さらに\cmd{@argdef}の定義（600行目）を参照すると，
+\begin{lstlisting}
+\@ifdefinable \ほげ{\@yargdef\ほげ\@ne{0}{ふが}}
+\end{lstlisting}
+を得る。よって，\cmd{@ifdefinable}によって制御綴\cmd{ほげ}が定義可能かどうかを調べ\footnote{この詳しい挙動もまた，本筋から外れるため今回は割愛する。}，可能である場合\cmd{@yargdef}以下が展開され，
+\begin{lstlisting}
+\ifx\@ne\tw@
+    \def\reserved@b##11{[####1]}%
+\else
+  \let\reserved@b\@gobble
+\fi
+\expandafter\@yargd@f \expandafter{\number 0}\ほげ{ふが}
+\end{lstlisting}
+となる。
+
+さて，今回\cmd{ifx}は偽であるため\cmd{reserved@b}には\cmd{@gobble}が代入される。\cmd{@gobble}自体は次のように定義されている。
+\latexltx
+\begin{lstlisting}[firstnumber=725]
+\long\def \@gobble #1{}
+\end{lstlisting}
+
+単に，「後ろの1トークンを展開させずに吸収する」制御綴のようである。
+
+話を戻そう。\TeX は上の例の最終行の展開に入り，
+\texsource
+\begin{lstlisting}
+\@yargd@f{0}\ほげ{ふが}
+\end{lstlisting}
+
+が得られるが\ \footnote{この\cmd{number}は，引数の個数を数字でなくカウンタで与えた時のために挿入されていると思われる。}，次に\cmd{@yargd@f}（633行目）の展開に入る。
+
+ここで，\cmd{@yargd@f}の定義を再掲しよう。
+\latexltx
+\begin{lstlisting}[firstnumber=633]
+\long \def \@yargd@f#1#2{%
+  \def \reserved@a ##1#1##2##{%
+    \expandafter\def\expandafter#2\reserved@b ##1#1%
+    }%
+  \l@ngrel@x \reserved@a 0##1##2##3##4##5##6##7##8##9###1%
+\end{lstlisting}
+
+これに基づくと，今回は
+\texsource
+\begin{lstlisting}
+#1 <- 0
+#2 <- \ほげ
+\end{lstlisting}
+
+が代入される事がわかる。
+
+\begin{question}
+\verb|##1|や\preSub\verb|##2|などは，引数を持つマクロの内部で，更に引数を持つマクロを定義するために登場していると理解できるが，634行目の\preSub\verb|##1#1##2##|\preSub など，最後の\preSub\verb|##|\preSub の挙動がわからない。
+\end{question}
+
+\begin{answer}
+『\TeX ブック』を参照した所，\verb|##|\preSub のように，\verb|#|\preSub を２つ続けて使用した場合，\TeX はその展開によって\preSub\verb|#|\preSub トークン１個を生成することがわかった。以下ではそれに基づいて考える。
+
+%あくまで推論の域を出ないが，パターンマッチ文字列として使用されているのではないか（ぶっちゃけ推察するより\TeX ブックに当たったほうが速いでしょうねハイ）。
+\end{answer}
+
+\begin{question}
+それだけでなく，\cmd{@yargd@f}展開時の，\preSub\verb|#|\preSub の取り去り方の規則もわからない。
+\end{question}
+
+\begin{answer}
+上と同様。展開時に「\preSub\verb|#|\preSub が取り去られる」と考えるのではなく，\preSub\verb|##|\preSub を展開すると\preSub\verb|#|\preSub が生成される，と考えるのが正しい。
+
+%\cmd{tracingmacros}などを駆使して，何とか辻褄を合わせた解釈（というより現象の列挙）が次のようになります…。
+\end{answer}
+
+\cmd{@yargd@f}をそのまま展開すると，
+\texsource
+\begin{lstlisting}
+\def \reserved@a #10#2#{\expandafter\def\expandafter\ほげ\reserved@b #10}%
+\l@ngrel@x \reserved@a 0#1#2#3#4#5#6#7#8#9#0{ふが}
+\end{lstlisting}
+が得られる。特に一番最後，\verb|###1|については，まず先頭の\preSub\verb|##|\preSub が\preSub\verb|#|\preSub に展開され，次に\preSub\verb|#1|に\texttt{0}を代入されることにより，\verb|#0|を得ている事に注意したい。
+
+さて次に\cmd{reserved@a}の定義を読んでいくと，一行目の展開終了後には，
+
+\begin{lstlisting}
+\reserved@a#10#2# -> \expandafter\def\expandafter\ほげ\reserved@b #10
+\end{lstlisting}
+
+となる。
+
+\begin{question}
+\verb|\reserved@a#10#2#|\preSub の最後の\preSub\verb|#|\preSub の意味がわからない。
+\end{question}
+
+\begin{answer}
+『\TeX ブック』の204頁に，以下のような記述がある。
+\begin{quotation}
+A special extension is allowed to these rules: If the very last character of the parameter text is \verb|#|, so that this \verb|#| is immediately followed by \verb|{|, {\TeX}~will behave as if the \verb|{| had been inserted at the right end of both the parameter text and the replacement text. For example, if you say `\verb|\def#1#{\hbox to #1}|', the subsequent text `\verb|\a3pt{x}|' will expand to `\verb|\hbox to 3pt{x}|', because the argument of \verb|\a| is delimited by a left brace.
+\end{quotation}
+
+従って，今回は\cmd{reserved@a}の第二引数は，パターンマッチ文字列\texttt{0}の後から中括弧\preSub\verb|{|\preSub{}が現れるまで全てということになる。
+\end{answer}
+
+さて次の行だが，普通に\cmd{l@ngrel@x}が\cmd{long}に置換されたのち，\cmd{reserved@a}が展開される。ここで，\TeX は\verb|0#1#2#3#4#5#6#7#8#9#0|を前から順に読んでいくわけだが，まずいきなりパターンマッチ文字\texttt{0}に出会うため，\TeX は第一引数を空とし，残りの文字列\preSub\verb|#1#2...|から\preSub\verb|{|\preSub までのトークン列を第二引数として読み込んでいく。
+
+結局\cmd{reserved@a}の引数は，
+\begin{lstlisting}
+#1 <- 
+#2 <- ##1##2##3##4##5##6##7##8##9##0
+\end{lstlisting}
+となる。従って，展開結果は次の通り。
+
+\begin{lstlisting}
+\long \expandafter\def\expandafter\ほげ\reserved@b 0{ふが}
+\end{lstlisting}
+
+あとは単純で，\cmd{reserved@b}（いまは\cmd{@gobble}の定義がコピーされている）の働きにより，
+\begin{lstlisting}
+\def\ほげ{ふが}
+\end{lstlisting}
+となり，無事に展開が完了する。\texttt{\#}\preSub まわりの正確な挙動および，引数を持つ場合の\cmd{newcommand}の動作などは，次週扱うことにする。
+
+
+
+%まず，\cmd{@yargd@f}をそのまま展開すると，
+%\texsource
+%\begin{lstlisting}
+%\def \reserved@a ##1#1##2##{\expandafter\def\expandafter#2\reserved@b ##1#1}%
+%\l@ngrel@x \reserved@a 0##1##2##3##4##5##6##7##8##9###1{ふが}
+%\end{lstlisting}
+%が得られる。もちろん，現在\verb\#1\には\texttt{0}が，\verb\#2\には\cmd{ほげ}が代入されている状態である。
+%
+%さて次に\cmd{reserved@a}の定義を読んでいくわけだが，\TeX は「いま，\cmd{@yargd@f}の展開作業中である」という事を理解しているため，\verb|##1|などを普通の\cmd{reserved@a}の引数としてみなし，\verb|#1|などは，上で記した\texttt{0}や\cmd{ほげ}などで置換していく。従って，一行目の展開終了後には，
+%
+%\begin{lstlisting}
+%\reserved@a##10##2## -> \expandafter\def\expandafter\ほげ\reserved@b ##10
+%\end{lstlisting}
+%
+%となる。問題は次の行だが，普通に\cmd{l@ngrel@x}が\cmd{long}に置換されたのち，\cmd{reserved@a}が展開される。ここで，\TeX は\verb|0##1##2##3##4##5##6##7##8##9###1|を前から順に読んでいくわけだが，まずいきなりパターンマッチ文字\texttt{0}に出会うため，\TeX は第一引数を空とし，残りの文字列\verb|##1##2...|を第二引数として読み込んでいく。だが，さらにその後に，\verb|###1|と出会った\TeX は，これを（謎の）前置文字\verb|##|と\verb|#1|に切り離してみなし\footnote{ここは\cmd{tracingmacros}に頼っただけです。よく分かりません。\cmd{reserved@a}の引数の末尾に付いている\verb|##|と関連がありそうです。}，結局\cmd{reserved@a}の引数としては，
+%\begin{lstlisting}
+%#1 <- 
+%#2 <- ##1##2##3##4##5##6##7##8##9##0
+%\end{lstlisting}
+%となるようである。従って，展開結果は次の通り。
+%
+%\begin{lstlisting}
+%\long \expandafter\def\expandafter\ほげ\reserved@b 0{ふが}
+%\end{lstlisting}
+%
+%あとは単純で，\cmd{reserved@b}（いまは\cmd{@gobble}の定義がコピーされている）の働きにより，
+%\begin{lstlisting}
+%\long\def\ほげ{ふが}
+%\end{lstlisting}
+%となり，無事に展開が完了する。\texttt{\#}まわりの正確な挙動および，引数を持つ場合の\cmd{newcommand}の動作などは，次週扱うことにする。
+
+
+%正直，初めて見た際には\verb\0##1##2##3##4##5##6##7##8##9###1\などの部分で面食らったが，
+
+
+\end{document}

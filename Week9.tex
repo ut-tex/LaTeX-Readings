@@ -1,0 +1,297 @@
+\documentclass[autodetect-engine,dvipdfmx]{jsarticle}
+
+\usepackage{okumacro}
+\usepackage[top=25truemm,bottom=25truemm,left=25truemm,right=25truemm]{geometry}
+\usepackage[dvipdfmx]{xcolor}
+\usepackage{ascmac}
+\usepackage{listings,jlisting}
+\usepackage{latexltx2015}
+
+\begin{document}
+
+\title{ latex.ltxリーディング \\ 第9回資料 }
+\author{ 東大\TeX 愛好会 }
+\date{2015年12月14日}
+\maketitle
+
+
+
+\section{エラーメッセージまわりその２（大浦）}
+
+\texttt{lterror.dtx}に由来する部分を読んでいく。定義の前半の２回目。
+
+\subsection{GenericError続論}
+
+Errorの続きをやる。定義:
+
+\latexltx
+\begin{lstlisting}[firstnumber=893]
+\bgroup
+\lccode`\@=`\ %
+\lccode`\~=`\ %
+\lccode`\}=`\ %
+\lccode`\{=`\ %
+\lccode`\T=`\T%
+\lccode`\H=`\H%
+\catcode`\ =11\relax%
+\lowercase{%
+\egroup%
+\dimen@\ifx\@TeXversion\@undefined4\else\@TeXversion\fi\p@%
+\ifdim\dimen@>3.14\p@%
+\DeclareRobustCommand{\GenericError}[4]{%
+\begingroup%
+\immediate\write\@unused{}%
+\def\MessageBreak{^^J}%
+\set@display@protect%
+\edef%
+\@err@                                                                 %
+{{#4}}%
+\errhelp
+\@err@                                                                 %
+\let
+\@err@                                                                 %
+\@empty
+\def\MessageBreak{^^J#1}%
+\def~{\errmessage{%
+#2.^^J^^J%
+#3^^J%
+Type  H <return>  for immediate help%
+\@err@                                                                 %
+}}%
+~%
+\endgroup}%
+\else%
+\DeclareRobustCommand{\GenericError}[4]{%
+\begingroup%
+\immediate\write\@unused{}%
+\def\MessageBreak{^^J}%
+\set@display@protect%
+\edef%
+\@err@                                                                 %
+{{#4}}%
+\errhelp
+\@err@                                                                 %
+\let
+\@err@                                                                 %
+\errmessage
+\def\MessageBreak{^^J#1}%
+\def~{\typeout{! %
+#2.^^J^^J%
+#3^^J%
+Type  H <return>  for immediate help.}%
+\@err@                                                                 %
+{}}%
+~%
+\endgroup}%
+\fi}%
+\end{lstlisting}
+
+であった。903〜905で条件分岐があり，\TeX バージョンが3.14より大きいかどうかで場合分けされることを述べた。（ちなみに，バージョンが不明の場合にはバージョン4として扱われる。）今回は，それぞれの場合について，\cmd{GenericError}の定義がどのようになっているかを具体的に見ていくことにする。
+
+\subsection{条件分岐１：バージョンが3.14より大きいとき}
+
+\latexltx
+\begin{lstlisting}[firstnumber=905]
+\DeclareRobustCommand{\GenericError}[4]{%
+\begingroup%
+\immediate\write\@unused{}%
+\def\MessageBreak{^^J}%
+\set@display@protect%
+\edef%
+\@err@                                                                 %
+{{#4}}%
+\errhelp
+\@err@                                                                 %
+\let
+\@err@                                                                 %
+\@empty
+\def\MessageBreak{^^J#1}%
+\def~{\errmessage{%
+#2.^^J^^J%
+#3^^J%
+Type  H <return>  for immediate help%
+\@err@                                                                 %
+}}%
+~%
+\endgroup}%
+\end{lstlisting}
+
+905行目で，\cmd{GenericError}は引数を四つとる堅牢な制御綴として定義されることが宣言される。907行目の，\cmd{immediate}\cmd{write}\cmd{@unused}については前回資料で述べた通り，そのあとの内容をターミナル送りなり\texttt{.log}ファイル送りなりにしてくれるコマンドなのだが，ここではその引数が空なので結局どうでもよい。その次の908行目で，\preSub\verb|^^J|\preSub つまり改行をエラーメッセージの区切りとして指定し，その次の909行目\cmd{set@display@protect}で，\cmd{protect}を\cmd{string}の別名として定義する（前回資料で扱った）。
+
+そして4番目の引数を\cmd{@err@}に展開した形で渡し，\cmd{errhelp}\cmd{@err@}を実行した上で\cmd{@err@}を\cmd{@empty}に，つまり空に戻しておく\footnote{念のため。\cmd{@empty}は\texttt{latex.ltx}の122行目に空の綴りとして定義されている。}。\cmd{errhelp}は引数を一つ取るプリミティブで，エラーメッセージが出たあと，hキー＋Returnキーを押した場合に表示されるメッセージを指定するコマンドである。ここまでではエラーメッセージの区切りは改行のままである。
+
+さて，ここでエラーメッセージの区切りの変更（918行目）となる。ただの改行\preSub\verb|^^J|\preSub に飽き足らず第一引数まで含めた\preSub\verb|^^J#1|\preSub をエラーメッセージとして定義する。その上で\~（チルダマーク）の定義を変更して，これが
+\texsource
+\begin{lstlisting}
+\errmessage{%
+#2.^^J^^J%
+#3^^J%
+Type  H <return>  for immediate help%
+\@err@                                                                 %
+}
+\end{lstlisting}
+の意味だというふうに定義してしまう。\cmd{errmessage}は，ターミナル及び\texttt{.log}ファイルに送られるエラーメッセージを指定するプリミティブである。923行目の\cmd{@err@}については，すでに空になっているはずなので，考える必要はない。
+
+そして，925行目で，今定義した\~（チルダマーク）を使ってエラーメッセージを生成し，終了となる。
+
+では，実際の例を見てみよう。
+
+
+\subsection{（条件分岐１）実際例として}
+
+実際例として，\texttt{latex.ltx}1062行目で定義されている\cmd{@nocounterr}を取り上げる。ソース☆0：
+\texsource
+\begin{lstlisting}
+\@nocounterr{ほげ}
+\end{lstlisting}
+を展開してみることにしよう。つまり，「ほげ」という名前のカウンタが定義されていなかったのに，
+\texsource
+\begin{lstlisting}
+\setcounter{ほげ}{10}
+\end{lstlisting}
+のようにあたかも「ほげ」という名前のカウンタがあるかのように書いてしまっったときに生成されるエラーの生成機序を追っていこうということである。まず，\cmd{@nocounterr}は次のように定義されている。
+
+\latexltx
+\begin{lstlisting}[firstnumber=1062]
+\gdef\@nocounterr#1{%
+  \@latex@error{No counter '#1' defined}\@eha}
+\end{lstlisting}
+
+これより，ソース☆0は，一段階展開されて次のソース☆1となる。
+\texsource
+\begin{lstlisting}
+\@latex@error{No counter 'ほげ' defined}\@eha}
+\end{lstlisting}
+
+ここで，\cmd{@latex@error}が展開される。\cmd{@latex@error}は，1003行目に，次のように定義されている。
+
+\latexltx
+\begin{lstlisting}[firstnumber=1003]
+\gdef\@latex@error#1#2{%
+   \GenericError{%
+      \space\space\space\@spaces\@spaces\@spaces
+   }{%
+      LaTeX Error: #1%
+   }{%
+      See the LaTeX manual or LaTeX Companion for explanation.%
+   }{#2}%
+}
+\end{lstlisting}
+
+これより，ソース☆1はもう一段階展開されて次のソース☆2となる。
+\texsource
+\begin{lstlisting}
+\GenericError{%
+   \space\space\space\@spaces\@spaces\@spaces
+}{%
+   LaTeX Error: No counter 'ほげ' defined%
+}{%
+   See the LaTeX manual or LaTeX Companion for explanation.%
+}{\@eha}%
+\end{lstlisting}
+
+そしてお待ちかね\cmd{GenericError}の展開となる。
+展開結果は次のようなソース☆3。
+\texsource
+\begin{lstlisting}
+\begingroup%
+\immediate\write\@unused{}%
+\def\MessageBreak{^^J}%
+\set@display@protect%
+\edef%
+\@err@                                                                 %
+{{\@eha}}%
+\errhelp
+\@err@                                                                 %
+\let
+\@err@                                                                 %
+\@empty
+\def\MessageBreak{^^J\space\space\space\@spaces\@spaces\@spaces}%
+\def~{\errmessage{%
+LaTeX Error: No counter 'ほげ' defined.^^J^^J%
+See the LaTeX manual or LaTeX Companion for explanation.^^J%
+Type  H <return>  for immediate help%
+\@err@                                                                 %
+}}%
+~%
+\endgroup
+\end{lstlisting}
+つまり，こういうこと。
+
+hキー＋Returnキーを押したときに表示されるヘルプメッセージの内容は，\cmd{@eha}になり，その区切り記号は改行である。
+
+エラーメッセージの内容は，LaTeX Error〜immediate helpであり，その区切り記号は改行＋\cmd{space}$\times3$＋\cmd{@spaces}$\times3$である。
+
+さて，\cmd{@eha}，\cmd{space}，\cmd{@spaces}という三つの初出コマンドが出てきたので一つずつ解説を加えよう。
+
+\cmd{@eha}については，別途\texttt{latex.ltx}に定義がある。
+
+\latexltx
+\begin{lstlisting}[firstnumber=1041]
+\gdef\@eha{%
+  Your command was ignored.\MessageBreak
+  Type \space I <command> <return> \space to replace it %
+  with another command,\MessageBreak
+  or \space <return> \space to continue without it.}
+\end{lstlisting}
+
+この時点では\cmd{MessageBreak}はただの改行なので，\cmd{MessageBreak}は改行に読み替えておけば良いし，\cmd{space}については後述する通りただの半角スペースなのでそう読み替えておけば良い。
+
+\cmd{space}についても，別途\texttt{latex.ltx}に定義がある。
+
+\latexltx
+\begin{lstlisting}[firstnumber=97]
+\def\space{ }
+\end{lstlisting}
+ただの半角スペースじゃないか。
+
+\cmd{@spaces}も\texttt{latex.ltx}由来のコマンドで，\cmd{@eha}を定義したすぐ上流の1040行目に定義されている。
+
+\latexltx
+\begin{lstlisting}[firstnumber=1040]
+\def\@spaces{\space\space\space\space}
+\end{lstlisting}
+
+ただの半角スペース4こ連続じゃないか。
+
+\subsection{条件分岐２：バージョンが3.14より小さいとき}
+
+\cmd{GenericError}の定義はこんな感じに変わる。
+
+\latexltx
+\begin{lstlisting}[firstnumber=928]
+\DeclareRobustCommand{\GenericError}[4]{%
+\begingroup%
+\immediate\write\@unused{}%
+\def\MessageBreak{^^J}%
+\set@display@protect%
+\edef%
+\@err@                                                                 %
+{{#4}}%
+\errhelp
+\@err@                                                                 %
+\let
+\@err@                                                                 %
+\errmessage
+\def\MessageBreak{^^J#1}%
+\def~{\typeout{! %
+#2.^^J^^J%
+#3^^J%
+Type  H <return>  for immediate help.}%
+\@err@                                                                 %
+{}}%
+~%
+\endgroup}%
+\end{lstlisting}
+
+\cmd{@err@}に第４引数を代入して，それをヘルプメッセージとして指定するところまでは同じである。そこからさきが若干異なる。\cmd{let}を使って，\cmd{@err@}を空にするのではなく\cmd{errmessage}の別名として定義し，次の\cmd{typeout}命令の中で使えるようにしてしまう。
+
+さて942行目からは先ほどの\cmd{errmessage}コマンドにかわり\cmd{typeout}命令に変わっている。これは\texttt{latex.ltx}に定義されたコマンドで，
+
+\latexltx
+\begin{lstlisting}[firstnumber=93]
+\def\typeout{\immediate\write17}
+\end{lstlisting}
+
+となっている。\cmd{write}のあとに続く数が15より大きいので，\cmd{typeout}の引数は，\texttt{.log}ファイル送りになりかつ，ターミナルに表示される。また，\cmd{@err@}は空ではないので今回は考える必要が生じるように思われるものの，今それは\cmd{errmessage}の別名であり，その引数もないので，結局考えなくて済んでしまう。
+\end{document}

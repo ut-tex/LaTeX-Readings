@@ -1,0 +1,564 @@
+\documentclass[autodetect-engine,dvipdfmx]{jsarticle}
+
+\usepackage{okumacro}
+\usepackage[top=25truemm,bottom=25truemm,left=25truemm,right=25truemm]{geometry}
+\usepackage[dvipdfmx]{xcolor}
+\usepackage{ascmac}
+\usepackage{listings,jlisting}
+\usepackage{latexltx2015}
+
+\begin{document}
+
+\title{ latex.ltxリーディング \\ 第4回資料 }
+\author{ 東大\TeX 愛好会 }
+\date{2015年6月5日}
+\maketitle
+
+\section{\cmd{newcommand}の動作（中編）（大門）}
+
+再び，\cmd{newcommand}関連の定義を掲載する。
+
+\latexltx
+\begin{lstlisting}[firstnumber=589]
+\def\@star@or@long#1{%
+  \@ifstar
+   {\let\l@ngrel@x\relax#1}%
+   {\let\l@ngrel@x\long#1}}
+\let\l@ngrel@x\relax
+\def\newcommand{\@star@or@long\new@command}
+\def\new@command#1{%
+  \@testopt{\@newcommand#1}0}
+\def\@newcommand#1[#2]{%
+  \kernel@ifnextchar [{\@xargdef#1[#2]}%
+                {\@argdef#1[#2]}}
+\long\def\@argdef#1[#2]#3{%
+   \@ifdefinable #1{\@yargdef#1\@ne{#2}{#3}}}
+\long\def\@xargdef#1[#2][#3]#4{%
+  \@ifdefinable#1{%
+     \expandafter\def\expandafter#1\expandafter{%
+          \expandafter
+          \@protected@testopt
+          \expandafter
+          #1%
+          \csname\string#1\endcsname
+          {#3}}%
+       \expandafter\@yargdef
+          \csname\string#1\endcsname
+           \tw@
+           {#2}%
+           {#4}}}
+\long\def\@testopt#1#2{%
+  \kernel@ifnextchar[{#1}{#1[{#2}]}}
+\def\@protected@testopt#1{%%
+  \ifx\protect\@typeset@protect
+    \expandafter\@testopt
+  \else
+    \@x@protect#1%
+  \fi}
+\long \def \@yargdef #1#2#3{%
+  \ifx#2\tw@
+    \def\reserved@b##11{[####1]}%
+  \else
+    \let\reserved@b\@gobble
+  \fi
+  \expandafter
+    \@yargd@f \expandafter{\number #3}#1%
+}
+\long \def \@yargd@f#1#2{%
+  \def \reserved@a ##1#1##2##{%
+    \expandafter\def\expandafter#2\reserved@b ##1#1%
+    }%
+  \l@ngrel@x \reserved@a 0##1##2##3##4##5##6##7##8##9###1%
+}
+\long\def\@reargdef#1[#2]{%
+  \@yargdef#1\@ne{#2}}
+\def\renewcommand{\@star@or@long\renew@command}
+\def\renew@command#1{%
+  \begingroup \escapechar\m@ne\xdef\@gtempa{{\string#1}}\endgroup
+  \expandafter\@ifundefined\@gtempa
+     {\@latex@error{\noexpand#1undefined}\@ehc}%
+     \relax
+  \let\@ifdefinable\@rc@ifdefinable
+  \new@command#1}
+\end{lstlisting}
+
+今回は前回に引き続き，引数が複数存在する場合，第一引数がオプションの場合，アスタリスクが付いている場合における\cmd{newcommand}の動作を考えていく。
+
+\subsection{例2：複数の引数をもつ場合}
+\texsource
+\begin{lstlisting}
+\newcommand{\ぴよ}[3]{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+上のコードは，\cmd{newcommand}（594行目）の展開により，
+\begin{lstlisting}
+\@star@or@long\new@command{\ぴよ}[3]{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+
+となる。さらに\cmd{@star@or@long}（589行目）を展開すると，
+\begin{lstlisting}
+\@ifstar{\let\l@ngrel@x\relax\new@command}{\let\l@ngrel@x\long\new@command}{\ぴよ}[3]{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+となる。今回はアスタリスクがついていないため，\cmd{@ifstar}の展開\footnote{詳細は本筋から外れるため割愛する。}により
+
+\begin{lstlisting}
+\let\l@ngrel@x\long\new@command{\ぴよ}[3]{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+
+が得られる。\cmd{let}の実行により，\cmd{l@ngrel@x}に\cmd{long}が代入され（これは後ほど再登場する），続けて\cmd{new@command}（595行目）が展開されるため，
+
+\begin{lstlisting}
+\@testopt{\@newcommand\ぴよ}0[3]{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+となる。\cmd{@testopt}は，616行目の定義を読めばわかる通り，引数の個数を指定する\texttt{[]}の有無を調べる制御綴となっている。
+これの展開により，
+\begin{lstlisting}
+\kernel@ifnextchar[{\@newcommand\ぴよ}{\@newcommand\ぴよ[{0}]}[3]{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+が得られるが，今回は直後にトークン``\texttt{[}''が続いているため，\cmd{kernel@ifnextchar}（これは，800行目で別途\preSub\verb|\let\kernel@ifnextchar\@ifnextchar|と定義されている）の展開・実行により次のようになる。
+\begin{lstlisting}
+\@newcommand\ぴよ[3]{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+これを597行目に従い素直に展開すると，
+\begin{lstlisting}
+\kernel@ifnextchar [{\@xargdef\ぴよ[3]}{\@argdef\ぴよ[3]}{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+を得る。先ほどと同様に\cmd{kernel@ifnextchar}の展開を考えると，今回は\cmd{\@argdef}の側が読み込まれるため（ここの\cmd{kernel@ifnextchar}は，第一引数の規定値を定める\texttt{[]}の有無を調べている），展開・実行後は
+\begin{lstlisting}
+\@argdef\ぴよ[3]{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+であり，さらに\cmd{@argdef}の定義（600行目）を参照すると，
+\begin{lstlisting}
+\@ifdefinable \ぴよ{\@yargdef\ぴよ\@ne{3}{好きな食べ物は#1と#2と#3です。}}
+\end{lstlisting}
+を得る。よって，\cmd{@ifdefinable}によって制御綴\cmd{ぴよ}が定義可能かどうかを調べ\footnote{この詳しい挙動もまた，本筋から外れるため今回は割愛する。}，可能である場合\cmd{@yargdef}以下が展開され，
+\begin{lstlisting}
+\ifx\@ne\tw@
+    \def\reserved@b##11{[####1]}%
+  \else
+    \let\reserved@b\@gobble
+  \fi
+  \expandafter
+    \@yargd@f \expandafter{\number 3}\ぴよ{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+となる。
+
+さて，今回\cmd{ifx}は偽であるため\cmd{let}の実行により\cmd{reserved@b}には\cmd{@gobble}が代入される。\cmd{@gobble}自体は次のように定義されている。
+\latexltx
+\begin{lstlisting}[firstnumber=725]
+\long\def \@gobble #1{}
+\end{lstlisting}
+
+単に，「後ろの1トークンを展開させずに吸収する」制御綴のようである。
+
+話を戻そう。\TeX は上の例の最終行の展開に入り，
+\texsource
+\begin{lstlisting}
+\@yargd@f{3}\ぴよ{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+
+が得られるが\ \footnote{この\cmd{number}は，引数の個数を数字でなくカウンタで与えた時のために挿入されていると思われる。}，次に\cmd{@yargd@f}（633行目）の展開に入る。これにより，
+\begin{lstlisting}
+\def \reserved@a ##13##2##{%
+    \expandafter\def\expandafter\ぴよ\reserved@b ##13%
+    }%
+  \l@ngrel@x \reserved@a 0##1##2##3##4##5##6##7##8##9###1{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+が得られる。以下前回紹介した規則に注意してこのコードを実行していく。
+
+まず最初の\cmd{def}の実行により，
+\begin{lstlisting}
+\reserved@a#13#2# -> \expandafter\def\expandafter\ぴよ\reserved@b #13
+\end{lstlisting}
+というトークンの置換が発生する。次に3行目を実行すると，
+\begin{lstlisting}
+   \l@ngrel@x \reserved@a 0##1##2##3##4##5##6##7##8##9###1{好きな食べ物は#1と#2と#3です。}
+-> \long \reserved@a 0##1##2##3##4##5##6##7##8##9###1{好きな食べ物は#1と#2と#3です。}
+-> \long\expandafter\def\expandafter\ぴよ\reserved@b 0#1#2#3{好きな食べ物は#1と#2と#3です。}
+-> \long\def\ぴよ#1#2#3{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+となる。\cmd{reserved@a}の引数として，
+\begin{lstlisting}
+#1 <- 0#1#2#
+#2 <- #4#5#6#7#8#9#3
+\end{lstlisting}
+が代入されている事に注意されたい。\cmd{reserved@a}の引数指定部中の3は，パターンマッチ文字列として使用されている。
+
+以上より，\TeX プリミティブのコードである
+\begin{lstlisting}
+\long\def\ぴよ#1#2#3{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+に無事置換することができた。
+
+\subsection{例3：複数の引数をもち，第一引数がオプショナルな場合}
+
+\begin{lstlisting}
+\newcommand{\ふが}[3][カレー]{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+
+\cmd{@newcommand}の展開までは，先ほどの例2と全く同様なので割愛する。このとき，
+
+\begin{lstlisting}
+\kernel@ifnextchar [{\@xargdef\ふが[3]}{\@argdef\ふが[3]}[カレー]{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+
+を得る。ここで，\cmd{kernel@ifnextchar}の展開を考えると，今回は\cmd{@xargdef}の側が読み込まれるため，展開・実行後は
+\begin{lstlisting}
+\@xargdef\ふが[3][カレー]{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+であり，さらに\cmd{@xargdef}の定義（602行目）を参照すると，
+
+\begin{lstlisting}
+\@ifdefinable\ふが{%
+   \expandafter\def\expandafter\ふが\expandafter{%
+        \expandafter
+        \@protected@testopt
+        \expandafter
+        \ふが%
+        \csname\string\ふが\endcsname
+        {カレー}}%
+     \expandafter\@yargdef
+        \csname\string\ふが\endcsname
+         \tw@
+         {3}%
+         {好きな食べ物は#1と#2と#3です。}}
+\end{lstlisting}
+
+を得る。よって，\cmd{@ifdefinable}によって制御綴\cmd{ふが}が定義可能かどうかを調べ，可能である場合以下が展開される。
+
+\begin{lstlisting}
+  \expandafter\def\expandafter\ふが\expandafter{%
+        \expandafter
+        \@protected@testopt
+        \expandafter
+        \ふが%
+        \csname\string\ふが\endcsname
+        {カレー}}%
+     \expandafter\@yargdef
+        \csname\string\ふが\endcsname
+         \tw@
+         {3}%
+         {好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+
+このコードの展開・実行を順次追っていくと，次のようになる。
+
+\begin{lstlisting}
+\expandafter\def\expandafter\ふが\expandafter{%
+        \expandafter
+        \@protected@testopt
+        \expandafter
+        \ふが%
+        \csname\string\ふが\endcsname
+        {カレー}}%
+     \expandafter\@yargdef
+        \csname\string\ふが\endcsname
+         \tw@
+         {3}%
+         {好きな食べ物は#1と#2と#3です。}
+
+-> \def\ふが{\@protected@testopt\ふが\\ふが{カレー}}%
+   \expandafter\@yargdef\csname\string\ふが\endcsname\tw@{3}{好きな食べ物は#1と#2と#3です。}
+
+-> \def\ふが{\@protected@testopt\ふが\\ふが{カレー}}%
+   \@yargdef\\ふが\tw@{3}{好きな食べ物は#1と#2と#3です。}
+
+   (以下\@yargdefの展開に入る)
+
+-> \def\reserved@b#11{[##1]}%
+   \expandafter\@yargd@f \expandafter{\number 3}\\ふが{好きな食べ物は#1と#2と#3です。}
+
+-> \@yargd@f{3}\\ふが{好きな食べ物は#1と#2と#3です。}
+
+   (以下\@yargd@fの展開に入る)
+
+-> \def \reserved@a #13#2#{\expandafter\def\expandafter\\ふが\reserved@b #13}
+   \l@ngrel@x \reserved@a 0#1#2#3#4#5#6#7#8#9#3{好きな食べ物は#1と#2と#3です。}
+
+-> \long\expandafter\def\expandafter\\ふが\reserved@b 0#1#2#3{好きな食べ物は#1と#2と#3です。}
+
+-> \long\def\\ふが[#1]#2#3{好きな食べ物は#1と#2と#3です}
+
+\end{lstlisting}
+
+途中で，\preSub\verb|\\ふが|\preSub という制御綴が\cmd{csname}および\cmd{string}により（無理やり）定義されている事に注目されたい。その内実は，
+\begin{lstlisting}
+\long\def\\ふが[#1]#2#3{好きな食べ物は#1と#2と#3です}
+\end{lstlisting}
+であり，さらに\cmd{ふが}は
+\begin{lstlisting}
+\def\ふが{\@protected@testopt\ふが\\ふが{カレー}}
+\end{lstlisting}
+と定義された。
+
+また，\cmd{reserved@b}の展開（最終行）にも注意されたい。これは，
+\begin{lstlisting}
+\def\reserved@b#11{[##1]}
+\end{lstlisting}
+と定義されている。今回では，
+\begin{lstlisting}
+\reserved@b 0#1#2#3
+\end{lstlisting}
+のうち，\preSub\verb|0#|\preSub が第一引数に相当する。展開時には\preSub\verb|[##1]|\preSub 中のトークン列\preSub\verb|##|\preSub が\preSub\verb|#|\preSub に展開されることにより，結果として
+\begin{lstlisting}
+[#1]#2#3
+\end{lstlisting}
+が得られている。
+
+\subsubsection{制御綴が使用された際の処理}
+
+さて実際に，\cmd{newcommand}がソース中で読み込まれた際の動作を考えよう。今回は例として，
+\begin{lstlisting}
+\newcommand{\ふが}[3][カレー]{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+と予め定義された状況を考える。まず確認だが，これにより，
+\begin{lstlisting}
+\def\ふが{\@protected@testopt\ふが\\ふが{カレー}}
+\def\\ふが[#1]#2#3{好きな食べ物は#1と#2と#3です。}
+\end{lstlisting}
+と定義される。
+
+展開・実行の様子を詳しく見てみると，次のようになる。まずは第一引数が与えられている場合を考えよう。
+\begin{lstlisting}
+\ふが[ラーメン]{そば}{つけ麺}
+
+-> \@protected@testopt\ふが\\ふが{カレー}[ラーメン]{そば}{つけ麺}
+
+-> \ifx\protect\@typeset@protect
+    \expandafter\@testopt
+  \else
+    \@x@protect\ふが%
+  \fi\\ふが{カレー}[ラーメン]{そば}{つけ麺}
+\end{lstlisting}
+さてここで，\cmd{@typeset@protect}という制御綴が登場する。
+\begin{question}
+\cmd{@typeset@protect}の意味，用法がよくわからない。
+\end{question}
+\begin{answer}
+\textsl{source2e.pdf}\footnote{\LaTeX2e プリミティブの命令の意味や使用法が解説されているテキスト}を参照したところ，これは\cmd{DeclarRobustCommand}などの，ロバストな制御綴の定義に関わるスイッチであると推察される。状況によって，\cmd{protect}または\cmd{relax}と等価になるようである。
+
+「普通の」制御綴を定義する場合については基本的に\cmd{protect}と等価で考えて良いと思われる（理由は後述）。この制御綴の正式な意味は，次回以降\cmd{DeclarRobustCommand}などの定義を考えていく中で理解していきたい。
+\end{answer}
+まず，\cmd{@typeset@protect}が\cmd{protect}に等しい場合，すなわち\cmd{ifx}が真である場合を考える。この時\TeX は
+\begin{lstlisting}
+\ifx\protect\@typeset@protect
+    \expandafter\@testopt
+  \else
+    \@x@protect\ふが%
+  \fi\\ふが{カレー}[ラーメン]{そば}{つけ麺}
+\end{lstlisting}
+を先頭から読み込んでゆくが，まず\cmd{expandafter}により\cmd{@testopt}が展開されないまま，\cmd{else}が読まれ，以下\cmd{fi}まで展開がスキップされるため，結局，if文の展開後には
+\begin{lstlisting}
+\@testopt\\ふが{カレー}[ラーメン]{そば}{つけ麺}
+\end{lstlisting}
+が得られる。あとは，\cmd{@testopt}の定義に従う事により，
+\begin{lstlisting}
+\\ふが[ラーメン]{そば}{つけ麺}
+\end{lstlisting}
+が無事に得られる。
+
+次に，\cmd{@typeset@protect}が\cmd{reelax}に等しい場合では，\TeX は
+\begin{lstlisting}
+\ifx\protect\@typeset@protect
+    \expandafter\@testopt
+  \else
+    \@x@protect\ふが%
+  \fi\\ふが{カレー}[ラーメン]{そば}{つけ麺}
+\end{lstlisting}
+の展開を行う際に，\cmd{@x@protect}の定義（763行目）
+\begin{lstlisting}
+\def\@x@protect#1\fi#2#3{%
+   \fi\protect#1%
+}
+\end{lstlisting}
+に従い，if文の外に
+\begin{lstlisting}
+\protect\ふが[ラーメン]{そば}{つけ麺}
+\end{lstlisting}
+を展開することになる。\cmd{protect}から察せられる通り，これは制御綴のロバストな定義に何かしら関わっていると考えられる。これら2例から分かる通り，通常の制御綴の定義を考える際には，\cmd{@typeset@protect}は\cmd{protect}と等価であると考えれば差し障りが無いといえる\footnote{もちろん，次週以降\cmd{@typeset@protect}の正式な意味が理解できた時点で，見解が変わるかもしれない。}。
+
+また，第一引数が省略されたの場合の挙動も簡単に推察できる。要するに，先の例から\texttt{[ラーメン]}を取り去って考えれば，
+\begin{lstlisting}
+\@testopt\\ふが{カレー}{そば}{つけ麺}
+\end{lstlisting}
+の展開により
+\begin{lstlisting}
+\\ふが[カレー]{そば}{つけ麺}
+\end{lstlisting}
+が正しく得られる。
+
+\subsection{例4：\cmd{newcommand*}の動作（アスタリスクが付く場合）}
+
+これは非常に単純で，1回展開後の
+\begin{lstlisting}
+\@star@or@long\new@command*{\hoge}[1]{hage#1}
+\end{lstlisting}
+で登場する\cmd{@star@or@long}の展開・実行により\cmd{l@ngrel@x}が\cmd{relax}と等価になる（これまでの全ての例では，\cmd{l@ngrel@x}は\cmd{long}と等価であった）。これにより，最後の\cmd{@yarg@f}の展開時に，
+\begin{lstlisting}
+\relax\def\hoge#1{hage#1}
+\end{lstlisting}
+となり，引数が段落をまたぐ事を禁止するようになる。
+
+
+\section{\LaTeX の環境入門（朝倉）}
+
+\LaTeX の環境（environment）は文書の論理構造化の上で重要な役割を果たす\LaTeX の特徴的な
+機構の一つである．本節では，環境を利用する際に使用する命令（\cmd{begin}と\cmd{end}）に
+注目しながら，その実態の理解を試みることにする．
+
+\subsection{環境の実体}
+
+はじめに，わかりにくいところは全部飛ばして\cmd{begin}と\cmd{end}の定義を簡単に俯瞰してみる．
+ここでは，一般の環境を\texttt{LaTeXenv}と表現することにする．
+
+\latexltx
+\begin{lstlisting}[firstnumber=3944]
+\def\begin#1{%
+  \@ifundefined{#1}%
+    {\def\reserved@a{\@latex@error{Environment #1 undefined}\@eha}}%
+    {\def\reserved@a{\def\@currenvir{#1}%
+     \edef\@currenvline{\on@line}%
+     \csname #1\endcsname}}%
+  \@ignorefalse
+  \begingroup\@endpefalse\reserved@a}
+\def\end#1{%
+  \csname end#1\endcsname\@checkend{#1}%
+  \expandafter\endgroup\if@endpe\@doendpe\fi
+  \if@ignore\@ignorefalse\ignorespaces\fi}
+\def\@checkend#1{\def\reserved@a{#1}\ifx
+      \reserved@a\@currenvir \else\@badend{#1}\fi}
+\let\@currenvline\@empty
+\end{lstlisting}
+
+\cmd{begin}の定義冒頭3945〜3929行目は\cmd{reseved@a}の定義を行うことに終始している．そして，
+定義された\cmd{reseved@a}は3951行目で\kenten{実行}されている．では，\cmd{reseved@a}には
+どのようなことが定義されているのだろうか．見ての通り，\cmd{LaTeXenv}が定義されているか否かで
+その定義が変化している．すなわち，\cmd{LaTeXenv}が未定義であった場合には
+「\texttt{Environment LaTeXenv undefined}」というエラーを吐き出すように定義され，
+\cmd{LaTeXenv}が定義済みであった場合には\cmd{@currenvir}と\cmd{@currenvline}を定義して
+\preSub\verb|\csname LaTeXenv\endcsname|（\cmd{LaTeXenv}）を\kenten{実行}するように
+定義される．
+
+一方，\cmd{end}の定義を見ると，はじめに\preSub\verb|\csname endLaTeXenv\endcsname|
+（\cmd{endLaTeXenv}）を\kenten{実行}してからいくつかの処理を行うようになっている．
+
+つまり，まとめると\preSub\verb|\begin{LaTeXenv} ... \end{LaTeXenv}|\preSub という
+一連の環境利用命令は，
+\syntax{\texttt{%
+（環境を始める内部手続き）\cmd{LaTeXenv} ...\ \cmd{endLaTeXenv}（環境を終える内部手続き）
+}}
+と書き換えられる．
+
+
+\subsection{終了のチェック}
+
+さて，以下ではたったいま「内部手続き」と称し，ブラックボックス化して述べた部分の処理について
+多少詳しく分析していくことにする．
+
+まずは\cmd{end}の定義中に登場する\cmd{@checkend}を考える．この制御綴は前ページに掲載した
+3956,3957行目で定義されている．この定義はとても単純で，\cmd{ifx}を用いることにより，
+引数に与えた文字列（\cmd{end}に渡した文字列）と\cmd{begin}の中で定義された\cmd{@currenvir}
+に格納された文字列が一致するかどうかを調べ，一致しない場合は\preSub\verb|\@badend{#1}|\preSub
+が展開されることになる．\cmd{@badend}自体は次のように定義されており，要するにエラーを
+吐き出させる．
+
+\begin{lstlisting}[firstnumber=1074]
+\gdef\@badend#1{%
+  \@latex@error{\protect\begin{\@currenvir}\@currenvline
+                     \space ended by \protect\end{#1}}\@eha}
+\end{lstlisting}
+
+なお，\cmd{begin}の\cmd{reserved@a}より前に\cmd{begingroup}，\cmd{end}の\cmd{@checkend}より
+後に\cmd{endgroup}があることに注意されたい．これにより，ある環境中で別の環境が入り込み，
+一時的に\cmd{@currenvir}が書き換えられたとしても（入り込んだ環境がきちんと閉じられていれば）
+問題なく条件分岐を行うことができる．
+
+
+\subsection{条件文とスイッチ}
+
+\TeX のプリミティブに\cmd{iftrue}や\cmd{iffalse}というものがある．これらはそれぞれ，
+「常に真の処理」と「常に偽の処理」を行わせる．そんなもの必要なのかと一瞬思うが，
+「可変命令への代入」ということを考えると役に立つことがわかる．すなわち，この仕組みは
+ちょうどスイッチのように使用できるのである．こうした例が\cmd{begin}と\cmd{end}に
+2種類含まれているので，見ていくことにする．
+
+最初に，\cmd{if@ignore}の周辺について考える．関連する定義を（今回関係する箇所に限らず）
+以下に記す．
+\begin{lstlisting}[firstnumber=1389]
+\def\@ignorefalse{\global\let\if@ignore\iffalse}
+\def\@ignoretrue {\global\let\if@ignore\iftrue}
+\@ignorefalse
+\let\ignorespacesafterend\@ignoretrue
+\end{lstlisting}
+
+1391行目で\cmd{@ignorefalse}が宣言されていることから，\cmd{if@ignore}には\cmd{iffalse}が
+代入されているのが初期状態であることがわかる．その上で，\cmd{begin}の中で改めて
+\cmd{@ignorefalse}が宣言され，環境開始前（\cmd{LaTeXenv}の展開前）の段階では確実に
+\cmd{if@ignore}には\cmd{iffalse}が代入された状態となっている．したがって，このまま環境の
+終了時（\cmd{endLaTeXenv}の展開後）まで，この状況が変化しない限り，\cmd{end}の定義の3995行目
+は「何もしない」ことになる．逆に，環境の終了時までに\cmd{@ignoretrue}が宣言されるなどして
+この状況が崩され，\cmd{if@ignore}に\cmd{iftrue}が代入された状態となっていた場合
+\footnote{\texttt{latex.ltx}内では\cmd{enddisplaymath}, \cmd{endequation}, 
+\cmd{enddisplaymath}, \cmd{endeqnarray}の定義末尾に\cmd{@ignoretrue}が存在している．}，
+\cmd{end}の定義の3995行目の\preSub\verb|\@ignorefalse\ignorespaces|が展開されることになる．
+ここで，\cmd{ignorespaces}は後続の空白を無視するプリミティブである．
+
+\begin{question}
+どのような場合にどうして，環境終了後に\cmd{ignorespaces}が必要となるのだろうか．
+\end{question}
+
+\newpage
+
+次に，\cmd{if@endpe}周りを考えよう．面白いことに，\cmd{if@ignore}と似た仕組みであるにも
+関わらず，こちらは別の方法を用いてその用意がなされている．関連する定義を以下に掲載しておく．
+
+\begin{lstlisting}[firstnumber=4449]
+\def\@doendpe{\@endpetrue
+     \def\par{\@restorepar\everypar{}\par\@endpefalse}\everypar
+               {{\setbox\z@\lastbox}\everypar{}\@endpefalse}}
+\newif\if@endpe
+\@endpefalse
+\end{lstlisting}
+
+ここで，\cmd{newif}はさきほどの\cmd{if@ignore}周りのスイッチ機構と同様のものを自動的に
+生成する\LaTeX のマクロである（今回は，その定義は割愛する）．すなわち，
+\cmd{newif}\cmd{ifHOGE}と宣言すると，自動的に\cmd{HOGEtrue}と\cmd{HOGEfalse}および
+条件判断のための制御綴\cmd{ifHoge}が使用可能になる．
+
+話を元に戻そう．もう一度1ページ目の定義を眺めてもらうと，スイッチの用意方法は異なるが，
+\cmd{if@endpe}周りと\cmd{if@ignore}周りではほとんど同じようなことが行われていることがわかる．
+\cmd{newif}によるスイッチの作成の直後，4453行目でも\cmd{@endpefalse}が宣言されているが，
+\cmd{begin}の定義のほぼ末尾の位置（3951行目）で再び\cmd{@endpefalse}が宣言されている．
+したがって，この状況が変化しない限りは\cmd{end}の定義中3954行目の\cmd{@doendpe}が展開
+されることはないが，もし環境の\cmd{begin}と\cmd{end}の間のどこかで\cmd{@endpetrue}の
+状態になった場合\footnote{\cmd{@endpetrue}は\texttt{latex.ltx}内では\cmd{@doendpe}と
+\cmd{endtrivlist}の定義中でのみ登場しており，\cmd{endtrivlist}の方はいくつかの環境の
+終了命令（\cmd{endcenter}, \cmd{endflushleft}, \cmd{endflushright}など）の定義内で登場
+している．}には\cmd{@doendpe}が展開される．この\cmd{@doendpe}に関する詳細は今回は扱わない
+ことにするが，\textsl{The \LaTeXe\ Sources}によると環境に後続する段落でインデントが
+挿入されることを防止しているようである．
+
+\begin{question}
+次の2通りの\TeX 文の違いは何か．
+\texsource
+\begin{lstlisting}
+\expandafter\endgroup\if@endpe\@doendpe\fi
+\if@endpe\@doendpe\fi\endgroup
+\end{lstlisting}
+\end{question}
+\begin{answer}
+下記URL先のページが参考になりそう．\\
+\qquad\verb|http://tex.stackexchange.com/questions/24495/what-exactly-does-doendpe-do|
+\end{answer}
+
+\begin{question}
+なぜ\cmd{if@endpe}の作成には\cmd{newif}を用い，\cmd{if@ignore}の作成には用いていないのか．
+\end{question}
+
+
+
+
+
+
+
+
+\end{document}
